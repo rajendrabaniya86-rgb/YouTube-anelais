@@ -193,6 +193,7 @@ function insideSpot(car: Rect, spot: Rect) {
 
 /* ---------- Component ---------- */
 type Status = "ready" | "driving" | "crashed" | "parked"
+type Phase = "menu" | "playing" | "handoff" | "results"
 
 export default function ParkingGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -202,6 +203,13 @@ export default function ParkingGame() {
   const [totalScore, setTotalScore] = useState(0)
   const [lastPoints, setLastPoints] = useState(0)
   const scoredRef = useRef<Record<number, boolean>>({})
+
+  // multiplayer (local pass & play)
+  const [phase, setPhase] = useState<Phase>("menu")
+  const [names, setNames] = useState<string[]>(["Player 1", "Player 2"])
+  const [numPlayers, setNumPlayers] = useState(1)
+  const [scores, setScores] = useState<number[]>([0, 0])
+  const [curPlayer, setCurPlayer] = useState(0)
 
   // control refs (avoid re-render in loop)
   const throttleRef = useRef(0) // -1 reverse, 1 forward
@@ -228,6 +236,46 @@ export default function ParkingGame() {
     throttleRef.current = 0
     steerRef.current = 0
   }, [])
+
+  // start a fresh run for the current player
+  const startRun = useCallback(() => {
+    scoredRef.current = {}
+    setTotalScore(0)
+    setBest({})
+    setPhase("playing")
+    resetLevel(0)
+  }, [resetLevel])
+
+  // begin a whole new game from the menu
+  const beginGame = useCallback(
+    (players: number) => {
+      setNumPlayers(players)
+      setScores([0, 0])
+      setCurPlayer(0)
+      startRun()
+    },
+    [startRun],
+  )
+
+  // called when the LAST level is parked — commit score, then hand off or finish
+  const finishPlayerRun = useCallback(() => {
+    setScores((prev) => {
+      const next = [...prev]
+      next[curPlayer] = totalScore
+      return next
+    })
+    if (numPlayers === 2 && curPlayer === 0) {
+      setPhase("handoff")
+    } else {
+      setPhase("results")
+    }
+  }, [curPlayer, numPlayers, totalScore, lastPoints])
+
+  // second player takes over
+  const startSecondPlayer = useCallback(() => {
+    setCurPlayer(1)
+    startRun()
+  }, [startRun])
 
   /* keyboard support (bonus for desktop) */
   useEffect(() => {
@@ -365,7 +413,7 @@ export default function ParkingGame() {
       cancelAnimationFrame(raf)
       window.removeEventListener("resize", resize)
     }
-  }, [])
+  }, [phase])
 
   /* pointer button binding helper */
   const bind = (kind: "gas" | "rev" | "left" | "right") => {
@@ -394,13 +442,131 @@ export default function ParkingGame() {
   const lv = LEVELS[levelIdx]
   const bestTime = best[levelIdx]
 
+  /* ----- Menu screen ----- */
+  if (phase === "menu") {
+    return (
+      <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
+        <div>
+          <h1 className="text-2xl font-bold text-card-foreground text-balance">Parking Challenge</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            8 levels. Park cleanly and fast to score up to 500 points each.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 text-left">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Player 1 name</span>
+            <input
+              value={names[0]}
+              onChange={(e) => setNames((n) => [e.target.value, n[1]])}
+              maxLength={14}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Player 2 name (for 2-player)
+            </span>
+            <input
+              value={names[1]}
+              onChange={(e) => setNames((n) => [n[0], e.target.value])}
+              maxLength={14}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </label>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => beginGame(1)}
+            className="flex-1 rounded-lg bg-muted px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-border"
+          >
+            Solo
+          </button>
+          <button
+            onClick={() => beginGame(2)}
+            className="flex-1 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            2 Players
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /* ----- Handoff screen (between players) ----- */
+  if (phase === "handoff") {
+    return (
+      <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Turn complete</p>
+        <div>
+          <p className="text-lg text-card-foreground">
+            {names[0] || "Player 1"} scored
+          </p>
+          <p className="font-mono text-4xl font-bold text-primary">{scores[0]}</p>
+        </div>
+        <p className="text-sm text-muted-foreground text-pretty">
+          Pass the device to {names[1] || "Player 2"} and tap start when ready.
+        </p>
+        <button
+          onClick={startSecondPlayer}
+          className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          {(names[1] || "Player 2") + "'s turn"}
+        </button>
+      </div>
+    )
+  }
+
+  /* ----- Results screen ----- */
+  if (phase === "results") {
+    const p1 = scores[0]
+    const p2 = scores[1]
+    const solo = numPlayers === 1
+    const winner = solo ? null : p1 === p2 ? "tie" : p1 > p2 ? 0 : 1
+    return (
+      <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
+        <h2 className="text-2xl font-bold text-card-foreground">
+          {solo ? "Course Complete!" : winner === "tie" ? "It's a Tie!" : `${names[winner as number] || `Player ${(winner as number) + 1}`} Wins!`}
+        </h2>
+        <div className="flex w-full flex-col gap-2">
+          <div
+            className={`flex items-center justify-between rounded-lg px-4 py-3 ${
+              winner === 0 ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+            }`}
+          >
+            <span className="font-semibold">{names[0] || "Player 1"}</span>
+            <span className="font-mono text-lg font-bold">{p1}</span>
+          </div>
+          {!solo && (
+            <div
+              className={`flex items-center justify-between rounded-lg px-4 py-3 ${
+                winner === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+              }`}
+            >
+              <span className="font-semibold">{names[1] || "Player 2"}</span>
+              <span className="font-mono text-lg font-bold">{p2}</span>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => setPhase("menu")}
+          className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          Play Again
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="flex w-full max-w-md flex-col gap-3">
       {/* HUD */}
       <div className="flex items-center justify-between rounded-xl bg-card px-4 py-3">
         <div className="flex flex-col">
           <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Level {levelIdx + 1} / {LEVELS.length}
+            {numPlayers === 2 ? `${names[curPlayer] || `Player ${curPlayer + 1}`} · ` : ""}Level {levelIdx + 1} /{" "}
+            {LEVELS.length}
           </span>
           <span className="text-lg font-semibold leading-tight text-card-foreground">{lv.name}</span>
         </div>
@@ -464,14 +630,10 @@ export default function ParkingGame() {
               )}
                 {status === "parked" && levelIdx === LEVELS.length - 1 && (
                   <button
-                    onClick={() => {
-                      scoredRef.current = {}
-                      setTotalScore(0)
-                      resetLevel(0)
-                    }}
+                    onClick={finishPlayerRun}
                     className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
                   >
-                    Play Again
+                    {numPlayers === 2 && curPlayer === 0 ? "Finish Turn" : "See Results"}
                   </button>
                 )}
             </div>
