@@ -119,12 +119,16 @@ const LEVELS: Level[] = [
   },
 ]
 
-/* ---------- Scoring ---------- */
-const PAR_TIME = 12 // seconds; beat this for full points
+/* ---------- Scoring & rating ---------- */
+function ratingFor(time: number) {
+  if (time <= 7) return 3
+  if (time <= 12) return 2
+  return 1
+}
 function scoreFor(time: number) {
-  // base 300, up to +200 bonus for parking under par time, min 100
-  const bonus = Math.max(0, Math.round((1 - Math.min(time, PAR_TIME) / PAR_TIME) * 200))
-  return Math.max(100, 300 + bonus)
+  const stars = ratingFor(time)
+  const base = stars === 3 ? 500 : stars === 2 ? 350 : 200
+  return base
 }
 
 /* ---------- Geometry helpers ---------- */
@@ -191,9 +195,74 @@ function insideSpot(car: Rect, spot: Rect) {
   return true
 }
 
+/* ---------- Audio (WebAudio, no assets) ---------- */
+type Audio = {
+  ctx: AudioContext
+  engineGain: GainNode
+  osc: OscillatorNode
+}
+function createAudio(): Audio | null {
+  try {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const ctx = new Ctx()
+    const engineGain = ctx.createGain()
+    engineGain.gain.value = 0
+    const filter = ctx.createBiquadFilter()
+    filter.type = "lowpass"
+    filter.frequency.value = 500
+    const osc = ctx.createOscillator()
+    osc.type = "sawtooth"
+    osc.frequency.value = 55
+    osc.connect(filter)
+    filter.connect(engineGain)
+    engineGain.connect(ctx.destination)
+    osc.start()
+    return { ctx, engineGain, osc }
+  } catch {
+    return null
+  }
+}
+function setEngine(a: Audio | null, active: boolean, speedFrac: number) {
+  if (!a) return
+  const g = a.engineGain.gain
+  const now = a.ctx.currentTime
+  const target = active ? 0.015 + speedFrac * 0.05 : 0
+  g.setTargetAtTime(target, now, 0.08)
+  a.osc.frequency.setTargetAtTime(50 + speedFrac * 95, now, 0.08)
+}
+function tone(a: Audio | null, freq: number, dur: number, type: OscillatorType = "square", vol = 0.14) {
+  if (!a) return
+  const now = a.ctx.currentTime
+  const o = a.ctx.createOscillator()
+  const g = a.ctx.createGain()
+  o.type = type
+  o.frequency.value = freq
+  g.gain.setValueAtTime(0, now)
+  g.gain.linearRampToValueAtTime(vol, now + 0.01)
+  g.gain.exponentialRampToValueAtTime(0.0001, now + dur)
+  o.connect(g)
+  g.connect(a.ctx.destination)
+  o.start(now)
+  o.stop(now + dur + 0.02)
+}
+function crashSound(a: Audio | null) {
+  if (!a) return
+  tone(a, 90, 0.35, "sawtooth", 0.25)
+  tone(a, 60, 0.4, "square", 0.2)
+}
+function successSound(a: Audio | null) {
+  if (!a) return
+  ;[523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(a, f, 0.22, "triangle", 0.16), i * 110))
+}
+
 /* ---------- Component ---------- */
 type Status = "ready" | "driving" | "crashed" | "parked"
 type Phase = "menu" | "playing" | "handoff" | "results"
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; color: string }
+type Skid = { x: number; y: number; a: number }
+type Sensor = { prox: number; aligned: boolean }
+
+const CONFETTI_COLORS = ["#e0a44a", "#5fe0b5", "#f5f1e6", "#c78b34"]
 
 export default function ParkingGame() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -202,6 +271,7 @@ export default function ParkingGame() {
   const [best, setBest] = useState<Record<number, number>>({})
   const [totalScore, setTotalScore] = useState(0)
   const [lastPoints, setLastPoints] = useState(0)
+  const [lastStars, setLastStars] = useState(0)
   const scoredRef = useRef<Record<number, boolean>>({})
 
   // multiplayer (local pass & play)
@@ -210,6 +280,8 @@ export default function ParkingGame() {
   const [numPlayers, setNumPlayers] = useState(1)
   const [scores, setScores] = useState<number[]>([0, 0])
   const [curPlayer, setCurPlayer] = useState(0)
+  const [muted, setMuted] = useState(false)
+  const mutedRef = useRef(false)
 
   // control refs (avoid re-render in loop)
   const throttleRef = useRef(0) // -1 reverse, 1 forward
@@ -226,6 +298,21 @@ export default function ParkingGame() {
   const statusRef = useRef<Status>("ready")
   const levelRef = useRef(0)
 
+  // juice refs
+  const audioRef = useRef<Audio | null>(null)
+  const particlesRef = useRef<Particle[]>([])
+  const skidsRef = useRef<Skid[]>([])
+  const shakeRef = useRef({ mag: 0, t: 0 })
+  const sensorRef = useRef<Sensor>({ prox: 0, aligned: false })
+  const beepAccRef = useRef(0)
+
+  const ensureAudio = useCallback(() => {
+    if (!audioRef.current) audioRef.current = createAudio()
+    if (audioRef.current && audioRef.current.ctx.state === "suspended") {
+      audioRef.current.ctx.resume().catch(() => {})
+    }
+  }, [])
+
   const resetLevel = useCallback((idx: number) => {
     const lv = LEVELS[idx]
     stateRef.current = { x: lv.car.x, y: lv.car.y, angle: lv.car.angle, speed: 0, time: 0 }
@@ -235,6 +322,10 @@ export default function ParkingGame() {
     setLevelIdx(idx)
     throttleRef.current = 0
     steerRef.current = 0
+    particlesRef.current = []
+    skidsRef.current = []
+    shakeRef.current = { mag: 0, t: 0 }
+    sensorRef.current = { prox: 0, aligned: false }
   }, [])
 
   // start a fresh run for the current player
@@ -249,12 +340,13 @@ export default function ParkingGame() {
   // begin a whole new game from the menu
   const beginGame = useCallback(
     (players: number) => {
+      ensureAudio()
       setNumPlayers(players)
       setScores([0, 0])
       setCurPlayer(0)
       startRun()
     },
-    [startRun],
+    [startRun, ensureAudio],
   )
 
   // called when the LAST level is parked — commit score, then hand off or finish
@@ -269,13 +361,14 @@ export default function ParkingGame() {
     } else {
       setPhase("results")
     }
-  }, [curPlayer, numPlayers, totalScore, lastPoints])
+  }, [curPlayer, numPlayers, totalScore])
 
   // second player takes over
   const startSecondPlayer = useCallback(() => {
+    ensureAudio()
     setCurPlayer(1)
     startRun()
-  }, [startRun])
+  }, [startRun, ensureAudio])
 
   /* keyboard support (bonus for desktop) */
   useEffect(() => {
@@ -309,7 +402,6 @@ export default function ParkingGame() {
     let raf = 0
     let last = performance.now()
 
-    // handle DPR sizing
     const resize = () => {
       const rect = canvas.getBoundingClientRect()
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
@@ -332,6 +424,7 @@ export default function ParkingGame() {
 
       const st = stateRef.current
       const active = statusRef.current === "ready" || statusRef.current === "driving"
+      const a = mutedRef.current ? null : audioRef.current
 
       if (active) {
         const th = throttleRef.current
@@ -339,17 +432,14 @@ export default function ParkingGame() {
           statusRef.current = "driving"
           setStatus("driving")
         }
-        // acceleration
         if (th > 0) st.speed += ACCEL * dt
         else if (th < 0) st.speed -= ACCEL * dt
         else {
-          // natural drag toward 0
           if (st.speed > 0) st.speed = Math.max(0, st.speed - DRAG * dt)
           else if (st.speed < 0) st.speed = Math.min(0, st.speed + DRAG * dt)
         }
         st.speed = Math.max(-MAX_REV, Math.min(MAX_FWD, st.speed))
 
-        // steering only when moving; reverse flips direction
         const dir = st.speed >= 0 ? 1 : -1
         const speedFactor = Math.min(1, Math.abs(st.speed) / 45)
         st.angle += steerRef.current * TURN * speedFactor * dir * dt
@@ -359,8 +449,37 @@ export default function ParkingGame() {
 
         if (statusRef.current === "driving") st.time += dt
 
+        // engine audio
+        setEngine(a, statusRef.current === "driving" || Math.abs(st.speed) > 1, Math.abs(st.speed) / MAX_FWD)
+
+        // skid marks when turning hard at speed
+        if (Math.abs(steerRef.current) > 0 && Math.abs(st.speed) > 55) {
+          const rear = { x: st.x - Math.cos(st.angle) * CAR_L * 0.35, y: st.y - Math.sin(st.angle) * CAR_L * 0.35 }
+          skidsRef.current.push({ x: rear.x, y: rear.y, a: st.angle })
+          if (skidsRef.current.length > 160) skidsRef.current.shift()
+        }
+
         const carRect: Rect = { x: st.x, y: st.y, w: CAR_L, h: CAR_W, angle: st.angle }
         const lv = LEVELS[levelRef.current]
+
+        // parking-sensor proximity + alignment
+        const dx = st.x - lv.spot.x
+        const dy = st.y - lv.spot.y
+        const dist = Math.hypot(dx, dy)
+        const prox = Math.max(0, Math.min(1, 1 - dist / 260))
+        let da = Math.abs(((st.angle - lv.spot.angle) % Math.PI + Math.PI) % Math.PI)
+        if (da > Math.PI / 2) da = Math.PI - da
+        const aligned = prox > 0.55 && da < 0.22
+        sensorRef.current = { prox, aligned }
+
+        // reverse-sensor beeps: faster as you approach
+        if (statusRef.current === "driving" && prox > 0.3 && a) {
+          beepAccRef.current -= dt
+          if (beepAccRef.current <= 0) {
+            tone(a, aligned ? 1500 : 1000, 0.05, "square", 0.08)
+            beepAccRef.current = aligned ? 0.09 : 0.55 - prox * 0.42
+          }
+        }
 
         // wall collision
         const cs = corners(carRect)
@@ -380,16 +499,32 @@ export default function ParkingGame() {
         if (hitObs) {
           statusRef.current = "crashed"
           setStatus("crashed")
+          shakeRef.current = { mag: 9, t: 0.4 }
+          setEngine(a, false, 0)
+          crashSound(a)
           st.speed = 0
-        } else if (
-          Math.abs(st.speed) < 6 &&
-          statusRef.current === "driving" &&
-          insideSpot(carRect, lv.spot)
-        ) {
+        } else if (Math.abs(st.speed) < 6 && statusRef.current === "driving" && insideSpot(carRect, lv.spot)) {
           statusRef.current = "parked"
           setStatus("parked")
           st.speed = 0
+          setEngine(a, false, 0)
+          successSound(a)
+          // confetti burst
+          for (let i = 0; i < 46; i++) {
+            const ang = Math.random() * Math.PI * 2
+            const sp = 60 + Math.random() * 180
+            particlesRef.current.push({
+              x: st.x,
+              y: st.y,
+              vx: Math.cos(ang) * sp,
+              vy: Math.sin(ang) * sp,
+              life: 1,
+              color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+            })
+          }
           const t = Math.round(st.time * 10) / 10
+          const stars = ratingFor(t)
+          setLastStars(stars)
           setBest((b) => {
             const prev = b[levelRef.current]
             if (prev == null || t < prev) return { ...b, [levelRef.current]: t }
@@ -402,9 +537,34 @@ export default function ParkingGame() {
             setTotalScore((s) => s + pts)
           }
         }
+      } else {
+        setEngine(a, false, 0)
       }
 
-      draw(ctx, canvas, stateRef.current, LEVELS[levelRef.current], statusRef.current)
+      // update particles
+      const parts = particlesRef.current
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const p = parts[i]
+        p.x += p.vx * dt
+        p.y += p.vy * dt
+        p.vx *= 0.96
+        p.vy = p.vy * 0.96 + 40 * dt
+        p.life -= dt * 0.9
+        if (p.life <= 0) parts.splice(i, 1)
+      }
+
+      // shake decay
+      if (shakeRef.current.t > 0) {
+        shakeRef.current.t -= dt
+        shakeRef.current.mag *= 0.9
+      }
+
+      draw(ctx, canvas, stateRef.current, LEVELS[levelRef.current], statusRef.current, {
+        particles: parts,
+        skids: skidsRef.current,
+        shake: shakeRef.current,
+        sensor: sensorRef.current,
+      })
       raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
@@ -427,6 +587,7 @@ export default function ParkingGame() {
     return {
       onPointerDown: (e: React.PointerEvent) => {
         e.preventDefault()
+        ensureAudio()
         ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
         set(true)
       },
@@ -439,6 +600,13 @@ export default function ParkingGame() {
     }
   }
 
+  const toggleMute = () => {
+    setMuted((m) => {
+      mutedRef.current = !m
+      return !m
+    })
+  }
+
   const lv = LEVELS[levelIdx]
   const bestTime = best[levelIdx]
 
@@ -448,8 +616,8 @@ export default function ParkingGame() {
       <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
         <div>
           <h1 className="text-2xl font-bold text-card-foreground text-balance">Parking Challenge</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            8 levels. Park cleanly and fast to score up to 500 points each.
+          <p className="mt-1 text-sm text-muted-foreground text-pretty">
+            8 levels. Beat the clock, earn up to 3 stars, and top the scoreboard.
           </p>
         </div>
 
@@ -500,9 +668,7 @@ export default function ParkingGame() {
       <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Turn complete</p>
         <div>
-          <p className="text-lg text-card-foreground">
-            {names[0] || "Player 1"} scored
-          </p>
+          <p className="text-lg text-card-foreground">{names[0] || "Player 1"} scored</p>
           <p className="font-mono text-4xl font-bold text-primary">{scores[0]}</p>
         </div>
         <p className="text-sm text-muted-foreground text-pretty">
@@ -526,8 +692,12 @@ export default function ParkingGame() {
     const winner = solo ? null : p1 === p2 ? "tie" : p1 > p2 ? 0 : 1
     return (
       <div className="flex w-full max-w-md flex-col items-center gap-5 rounded-2xl border border-border bg-card p-6 text-center shadow-2xl">
-        <h2 className="text-2xl font-bold text-card-foreground">
-          {solo ? "Course Complete!" : winner === "tie" ? "It's a Tie!" : `${names[winner as number] || `Player ${(winner as number) + 1}`} Wins!`}
+        <h2 className="text-2xl font-bold text-card-foreground text-balance">
+          {solo
+            ? "Course Complete!"
+            : winner === "tie"
+              ? "It's a Tie!"
+              : `${names[winner as number] || `Player ${(winner as number) + 1}`} Wins!`}
         </h2>
         <div className="flex w-full flex-col gap-2">
           <div
@@ -570,7 +740,7 @@ export default function ParkingGame() {
           </span>
           <span className="text-lg font-semibold leading-tight text-card-foreground">{lv.name}</span>
         </div>
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-4">
           <div className="flex flex-col items-end">
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Best</span>
             <span className="font-mono text-lg font-semibold text-accent">
@@ -581,6 +751,13 @@ export default function ParkingGame() {
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Score</span>
             <span className="font-mono text-lg font-semibold text-primary">{totalScore}</span>
           </div>
+          <button
+            onClick={toggleMute}
+            aria-label={muted ? "Unmute" : "Mute"}
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-foreground transition-colors hover:bg-border"
+          >
+            {muted ? <MuteIcon /> : <SoundIcon />}
+          </button>
         </div>
       </div>
 
@@ -599,19 +776,14 @@ export default function ParkingGame() {
         {(status === "crashed" || status === "parked") && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/70 backdrop-blur-sm">
             <div className="text-center">
-              <p
-                className={`text-2xl font-bold ${status === "parked" ? "text-accent" : "text-destructive"}`}
-              >
-                {status === "parked" ? "Parked!" : "Crashed!"}
+              <p className={`text-2xl font-bold ${status === "parked" ? "text-accent" : "text-destructive"}`}>
+                {status === "parked" ? "Perfect Park!" : "Crashed!"}
               </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {status === "parked"
-                    ? `Time ${stateRef.current.time.toFixed(1)}s`
-                    : "Watch the other cars and walls."}
-                </p>
-                {status === "parked" && (
-                  <p className="mt-2 font-mono text-xl font-bold text-primary">+{lastPoints} pts</p>
-                )}
+              {status === "parked" && <StarRow stars={lastStars} />}
+              <p className="mt-1 text-sm text-muted-foreground">
+                {status === "parked" ? `Time ${stateRef.current.time.toFixed(1)}s` : "Watch the other cars and walls."}
+              </p>
+              {status === "parked" && <p className="mt-2 font-mono text-xl font-bold text-primary">+{lastPoints} pts</p>}
             </div>
             <div className="flex gap-3">
               <button
@@ -628,14 +800,14 @@ export default function ParkingGame() {
                   Next Level
                 </button>
               )}
-                {status === "parked" && levelIdx === LEVELS.length - 1 && (
-                  <button
-                    onClick={finishPlayerRun}
-                    className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-                  >
-                    {numPlayers === 2 && curPlayer === 0 ? "Finish Turn" : "See Results"}
-                  </button>
-                )}
+              {status === "parked" && levelIdx === LEVELS.length - 1 && (
+                <button
+                  onClick={finishPlayerRun}
+                  className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                >
+                  {numPlayers === 2 && curPlayer === 0 ? "Finish Turn" : "See Results"}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -664,9 +836,53 @@ export default function ParkingGame() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Hold gas / reverse and steer. Stop fully inside the bay to park. Desktop: arrow keys, R to reset.
+        Hold gas / reverse and steer. Listen for the parking sensor — faster beeps mean you&apos;re close. Stop fully
+        inside the bay to park.
       </p>
     </div>
+  )
+}
+
+/* ---------- Small UI bits ---------- */
+function StarRow({ stars }: { stars: number }) {
+  return (
+    <div className="mt-2 flex items-center justify-center gap-1">
+      {[1, 2, 3].map((i) => (
+        <Star key={i} filled={i <= stars} />
+      ))}
+    </div>
+  )
+}
+
+function Star({ filled }: { filled: boolean }) {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true" className={filled ? "text-primary" : "text-muted"}>
+      <path
+        d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 17.8 6.1 20.2l1.2-6.6L2.5 9l6.6-.9L12 2z"
+        fill={filled ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function SoundIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11 5 6 9H2v6h4l5 4V5z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14" />
+    </svg>
+  )
+}
+
+function MuteIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M11 5 6 9H2v6h4l5 4V5z" />
+      <path d="M23 9l-6 6M17 9l6 6" />
+    </svg>
   )
 }
 
@@ -726,12 +942,15 @@ function draw(
   car: { x: number; y: number; angle: number; speed: number },
   lv: Level,
   status: Status,
+  extra: { particles: Particle[]; skids: Skid[]; shake: { mag: number; t: number }; sensor: Sensor },
 ) {
   const cw = canvas.width
   const ch = canvas.height
   const scale = Math.min(cw / WORLD_W, ch / WORLD_H)
-  const offX = (cw - WORLD_W * scale) / 2
-  const offY = (ch - WORLD_H * scale) / 2
+  const shakeX = extra.shake.t > 0 ? (Math.random() - 0.5) * extra.shake.mag : 0
+  const shakeY = extra.shake.t > 0 ? (Math.random() - 0.5) * extra.shake.mag : 0
+  const offX = (cw - WORLD_W * scale) / 2 + shakeX
+  const offY = (ch - WORLD_H * scale) / 2 + shakeY
 
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.clearRect(0, 0, cw, ch)
@@ -757,25 +976,37 @@ function draw(
     ctx.stroke()
   }
 
+  // skid marks
+  ctx.fillStyle = "rgba(20,22,26,0.5)"
+  for (const s of extra.skids) {
+    ctx.save()
+    ctx.translate(s.x, s.y)
+    ctx.rotate(s.a)
+    ctx.fillRect(-4, -CAR_W / 2 + 2, 8, 3)
+    ctx.fillRect(-4, CAR_W / 2 - 5, 8, 3)
+    ctx.restore()
+  }
+
   // border wall
   ctx.strokeStyle = "#e0a44a"
   ctx.lineWidth = 6
   ctx.strokeRect(3, 3, WORLD_W - 6, WORLD_H - 6)
 
-  // parking spot
+  // parking spot — glows with proximity, turns solid green when aligned
   const parked = status === "parked"
+  const glow = parked ? 1 : extra.sensor.prox
   ctx.save()
   ctx.translate(lv.spot.x, lv.spot.y)
   ctx.rotate(lv.spot.angle)
-  ctx.fillStyle = parked ? "rgba(80,210,170,0.28)" : "rgba(80,210,170,0.12)"
+  const fillA = 0.1 + glow * 0.25
+  ctx.fillStyle = extra.sensor.aligned || parked ? `rgba(95,224,181,${0.2 + glow * 0.25})` : `rgba(80,210,170,${fillA})`
   ctx.fillRect(-lv.spot.w / 2, -lv.spot.h / 2, lv.spot.w, lv.spot.h)
-  ctx.strokeStyle = parked ? "#5fe0b5" : "#4fd0a5"
+  ctx.strokeStyle = extra.sensor.aligned || parked ? "#7fffd0" : "#4fd0a5"
   ctx.lineWidth = 3
   ctx.setLineDash([12, 8])
   ctx.strokeRect(-lv.spot.w / 2, -lv.spot.h / 2, lv.spot.w, lv.spot.h)
   ctx.setLineDash([])
-  // P marker
-  ctx.fillStyle = "rgba(95,224,181,0.8)"
+  ctx.fillStyle = `rgba(127,255,208,${0.5 + glow * 0.4})`
   ctx.font = "bold 22px sans-serif"
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
@@ -791,7 +1022,6 @@ function draw(
     if (isCar) {
       drawCarBody(ctx, o.w, o.h, "#8891a0", "#6b7280")
     } else {
-      // wall / curb
       ctx.fillStyle = "#4a5058"
       roundRect(ctx, -o.w / 2, -o.h / 2, o.w, o.h, 4)
       ctx.fill()
@@ -811,6 +1041,14 @@ function draw(
   const crashed = status === "crashed"
   drawCarBody(ctx, CAR_L, CAR_W, crashed ? "#c65b4e" : "#e0a44a", crashed ? "#a8483d" : "#c78b34", true)
   ctx.restore()
+
+  // confetti particles
+  for (const p of extra.particles) {
+    ctx.globalAlpha = Math.max(0, p.life)
+    ctx.fillStyle = p.color
+    ctx.fillRect(p.x - 3, p.y - 3, 6, 6)
+  }
+  ctx.globalAlpha = 1
 }
 
 function drawCarBody(
@@ -821,7 +1059,6 @@ function drawCarBody(
   stroke: string,
   isPlayer = false,
 ) {
-  // shadow
   ctx.save()
   ctx.translate(2, 3)
   ctx.fillStyle = "rgba(0,0,0,0.25)"
@@ -829,7 +1066,6 @@ function drawCarBody(
   ctx.fill()
   ctx.restore()
 
-  // body (len is along x axis = heading)
   ctx.fillStyle = body
   roundRect(ctx, -len / 2, -wid / 2, len, wid, 6)
   ctx.fill()
@@ -837,16 +1073,13 @@ function drawCarBody(
   ctx.strokeStyle = stroke
   ctx.stroke()
 
-  // windshield
   ctx.fillStyle = "rgba(30,40,55,0.75)"
   roundRect(ctx, len * 0.06, -wid / 2 + 3, len * 0.24, wid - 6, 3)
   ctx.fill()
-  // rear window
   roundRect(ctx, -len * 0.3, -wid / 2 + 3, len * 0.22, wid - 6, 3)
   ctx.fill()
 
   if (isPlayer) {
-    // headlights at front (+x)
     ctx.fillStyle = "#fff6da"
     roundRect(ctx, len / 2 - 4, -wid / 2 + 2, 3, 5, 1)
     ctx.fill()
