@@ -65,7 +65,67 @@ const LEVELS: Level[] = [
       { x: 360, y: 170, w: 40, h: 40, angle: 0 },
     ],
   },
+  {
+    name: "Crowded Lot",
+    hint: "Slip into the only free bay in a packed parking lot.",
+    car: { x: 400, y: 520, angle: -Math.PI / 2 },
+    spot: { x: 400, y: 150, w: CAR_W + 16, h: CAR_L + 18, angle: 0 },
+    obstacles: [
+      { x: 240, y: 150, w: CAR_W + 8, h: CAR_L + 10, angle: 0 },
+      { x: 320, y: 150, w: CAR_W + 8, h: CAR_L + 10, angle: 0 },
+      { x: 480, y: 150, w: CAR_W + 8, h: CAR_L + 10, angle: 0 },
+      { x: 560, y: 150, w: CAR_W + 8, h: CAR_L + 10, angle: 0 },
+      { x: 240, y: 320, w: CAR_W + 8, h: CAR_L + 10, angle: 0 },
+      { x: 560, y: 320, w: CAR_W + 8, h: CAR_L + 10, angle: 0 },
+    ],
+  },
+  {
+    name: "Angled Bay",
+    hint: "Line up with the tilted bay and glide in.",
+    car: { x: 160, y: 480, angle: 0 },
+    spot: { x: 600, y: 200, w: CAR_W + 18, h: CAR_L + 22, angle: Math.PI / 6 },
+    obstacles: [
+      { x: 520, y: 250, w: CAR_W + 8, h: CAR_L + 10, angle: Math.PI / 6 },
+      { x: 680, y: 150, w: CAR_W + 8, h: CAR_L + 10, angle: Math.PI / 6 },
+      { x: 360, y: 400, w: 40, h: 40, angle: 0 },
+      { x: 400, y: 130, w: 260, h: 26, angle: 0 },
+    ],
+  },
+  {
+    name: "Zig Zag",
+    hint: "Weave between the walls and back into the far bay.",
+    car: { x: 120, y: 120, angle: Math.PI / 2 },
+    spot: { x: 660, y: 480, w: CAR_W + 16, h: CAR_L + 18, angle: 0 },
+    obstacles: [
+      { x: 260, y: 200, w: 26, h: 260, angle: 0 },
+      { x: 460, y: 380, w: 26, h: 260, angle: 0 },
+      { x: 580, y: 480, w: CAR_W + 8, h: CAR_L + 10, angle: 0 },
+      { x: 660, y: 300, w: 200, h: 26, angle: 0 },
+    ],
+  },
+  {
+    name: "Master Class",
+    hint: "The ultimate test: tight parallel park among pillars.",
+    car: { x: 130, y: 200, angle: 0 },
+    spot: { x: 470, y: 450, w: CAR_L + 22, h: CAR_W + 14, angle: 0 },
+    obstacles: [
+      { x: 355, y: 450, w: CAR_L + 4, h: CAR_W + 6, angle: 0 },
+      { x: 590, y: 450, w: CAR_L + 4, h: CAR_W + 6, angle: 0 },
+      { x: 470, y: 540, w: 720, h: 30, angle: 0 },
+      { x: 300, y: 250, w: 40, h: 40, angle: 0 },
+      { x: 560, y: 250, w: 40, h: 40, angle: 0 },
+      { x: 430, y: 250, w: 40, h: 40, angle: 0 },
+    ],
+  },
 ]
+
+/* ---------- Scoring ---------- */
+const PAR_TIME = 12 // seconds; beat this for full points
+function scoreFor(time: number) {
+  // base 300, up to +200 bonus for parking under par time, min 100
+  const bonus = Math.max(0, Math.round((1 - Math.min(time, PAR_TIME) / PAR_TIME) * 200))
+  return Math.max(100, 300 + bonus)
+}
 
 /* ---------- Geometry helpers ---------- */
 function corners(r: Rect) {
@@ -139,6 +199,9 @@ export default function ParkingGame() {
   const [levelIdx, setLevelIdx] = useState(0)
   const [status, setStatus] = useState<Status>("ready")
   const [best, setBest] = useState<Record<number, number>>({})
+  const [totalScore, setTotalScore] = useState(0)
+  const [lastPoints, setLastPoints] = useState(0)
+  const scoredRef = useRef<Record<number, boolean>>({})
 
   // control refs (avoid re-render in loop)
   const throttleRef = useRef(0) // -1 reverse, 1 forward
@@ -208,11 +271,11 @@ export default function ParkingGame() {
     resize()
     window.addEventListener("resize", resize)
 
-    const MAX_FWD = 135
-    const MAX_REV = 78
-    const ACCEL = 190
-    const DRAG = 130
-    const TURN = 2.7
+    const MAX_FWD = 95
+    const MAX_REV = 58
+    const ACCEL = 130
+    const DRAG = 115
+    const TURN = 2.5
 
     const step = (now: number) => {
       let dt = (now - last) / 1000
@@ -284,6 +347,12 @@ export default function ParkingGame() {
             if (prev == null || t < prev) return { ...b, [levelRef.current]: t }
             return b
           })
+          const pts = scoreFor(t)
+          setLastPoints(pts)
+          if (!scoredRef.current[levelRef.current]) {
+            scoredRef.current[levelRef.current] = true
+            setTotalScore((s) => s + pts)
+          }
         }
       }
 
@@ -335,11 +404,17 @@ export default function ParkingGame() {
           </span>
           <span className="text-lg font-semibold leading-tight text-card-foreground">{lv.name}</span>
         </div>
-        <div className="flex flex-col items-end">
-          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Best</span>
-          <span className="font-mono text-lg font-semibold text-accent">
-            {bestTime != null ? `${bestTime.toFixed(1)}s` : "--"}
-          </span>
+        <div className="flex items-center gap-5">
+          <div className="flex flex-col items-end">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Best</span>
+            <span className="font-mono text-lg font-semibold text-accent">
+              {bestTime != null ? `${bestTime.toFixed(1)}s` : "--"}
+            </span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Score</span>
+            <span className="font-mono text-lg font-semibold text-primary">{totalScore}</span>
+          </div>
         </div>
       </div>
 
@@ -363,11 +438,14 @@ export default function ParkingGame() {
               >
                 {status === "parked" ? "Parked!" : "Crashed!"}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {status === "parked"
-                  ? `Time ${stateRef.current.time.toFixed(1)}s`
-                  : "Watch the other cars and walls."}
-              </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {status === "parked"
+                    ? `Time ${stateRef.current.time.toFixed(1)}s`
+                    : "Watch the other cars and walls."}
+                </p>
+                {status === "parked" && (
+                  <p className="mt-2 font-mono text-xl font-bold text-primary">+{lastPoints} pts</p>
+                )}
             </div>
             <div className="flex gap-3">
               <button
@@ -384,14 +462,18 @@ export default function ParkingGame() {
                   Next Level
                 </button>
               )}
-              {status === "parked" && levelIdx === LEVELS.length - 1 && (
-                <button
-                  onClick={() => resetLevel(0)}
-                  className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-                >
-                  Play Again
-                </button>
-              )}
+                {status === "parked" && levelIdx === LEVELS.length - 1 && (
+                  <button
+                    onClick={() => {
+                      scoredRef.current = {}
+                      setTotalScore(0)
+                      resetLevel(0)
+                    }}
+                    className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+                  >
+                    Play Again
+                  </button>
+                )}
             </div>
           </div>
         )}
