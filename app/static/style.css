@@ -1,0 +1,27 @@
+:root { color-scheme: dark; }
+body {
+  margin: 0 auto; max-width: 1040px; padding: 24px;
+  font-family: "Segoe UI", system-ui, sans-serif; background: #0f1115; color: #e8e8ea;
+}
+h1 { margin-bottom: 4px; }
+h2 { margin-top: 32px; border-bottom: 1px solid #2a2d36; padding-bottom: 6px; }
+button {
+  background: #ff0033; color: #fff; border: 0; border-radius: 6px;
+  padding: 9px 14px; margin: 4px 6px 4px 0; cursor: pointer; font-size: 14px;
+}
+button:hover { filter: brightness(1.1); }
+input {
+  background: #171a21; border: 1px solid #2a2d36; color: #e8e8ea;
+  padding: 8px; border-radius: 6px; width: 280px;
+}
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid #23262f; vertical-align: top; }
+th { color: #9aa0ad; font-weight: 600; }
+.tags { color: #6cc3ff; }
+.status.uploaded { color: #4ade80; }
+.status.failed { color: #f87171; }
+.status.rendered { color: #fbbf24; }
+.muted { color: #9aa0ad; }
+pre { white-space: pre-wrap; background: #171a21; padding: 12px; border-radius: 8px; }
+a { color: #6cc3ff; }
+.keyword-box ul { columns: 2; font-size: 14px; color: #9aa0ad; }

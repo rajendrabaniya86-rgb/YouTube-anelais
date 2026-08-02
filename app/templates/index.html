@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YT Autopilot</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>YT Autopilot</h1>
+    <p>Niche: <strong>{{ settings.channel_topic }}</strong> &middot;
+       रोज़: {{ settings.daily_shorts }} shorts + {{ settings.daily_longs }} long &middot;
+       अगला ऑटो रन: <strong>{{ next_run or "scheduler off" }}</strong></p>
+    <div class="actions">
+      <button onclick="run(true)">अभी बनाओ और पोस्ट करो</button>
+      <button onclick="run(false)">सिर्फ़ वीडियो बनाओ (upload नहीं)</button>
+      <button onclick="report()">एनालिटिक्स रिपोर्ट रिफ्रेश</button>
+    </div>
+    <div class="keyword-box">
+      <input id="seed" placeholder="कीवर्ड रिसर्च: कोई टॉपिक लिखें" />
+      <button onclick="keywords()">खोजो</button>
+      <ul id="kw"></ul>
+    </div>
+  </header>
+
+  <section>
+    <h2>वीडियो</h2>
+    <table>
+      <tr><th>कब</th><th>टाइप</th><th>टाइटल</th><th>हैशटैग</th><th>स्टेटस</th><th>लिंक</th></tr>
+      {% for v in videos %}
+      <tr>
+        <td>{{ v.created_at }}</td>
+        <td>{{ v.kind }}</td>
+        <td>{{ v.title }}</td>
+        <td class="tags">{{ v.hashtags | join(" ") }}</td>
+        <td class="status {{ v.status }}">{{ v.status }}{% if v.error %} — {{ v.error[:80] }}{% endif %}</td>
+        <td>{% if v.video_id %}<a href="https://youtu.be/{{ v.video_id }}" target="_blank">YouTube</a>{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">अभी कोई वीडियो नहीं।</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  <section>
+    <h2>कमी–कमज़ोरी रिपोर्ट</h2>
+    {% if report %}
+      <p class="muted">{{ report.created_at }}</p>
+      <pre>{{ report.body }}</pre>
+    {% else %}
+      <p class="muted">अभी रिपोर्ट नहीं बनी।</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>रन लॉग</h2>
+    {% for r in runs %}
+      <details>
+        <summary>{{ r.started_at }} — {{ r.status }}</summary>
+        <pre>{{ r.log }}</pre>
+      </details>
+    {% else %}
+      <p class="muted">कोई रन नहीं।</p>
+    {% endfor %}
+  </section>
+
+  <script>
+    const TOKEN = {{ token | tojson }};
+    const auth = TOKEN ? { 'X-Dashboard-Token': TOKEN } : {};
+
+    async function run(upload) {
+      await fetch(`/api/run?upload=${upload}`, { method: 'POST', headers: auth });
+      alert('रन शुरू हो गया — कुछ मिनट बाद पेज रिफ्रेश करें।');
+    }
+    async function report() {
+      const res = await fetch('/api/report', { method: 'POST', headers: auth });
+      if (res.ok) location.reload(); else alert((await res.json()).error);
+    }
+    async function keywords() {
+      const seed = document.getElementById('seed').value;
+      const res = await fetch(`/api/keywords?seed=${encodeURIComponent(seed)}`, { headers: auth });
+      const data = await res.json();
+      const list = document.getElementById('kw');
+      list.replaceChildren(...data.keywords.map(k => {
+        const li = document.createElement('li');
+        li.textContent = k;
+        return li;
+      }));
+    }
+  </script>
+</body>
+</html>
