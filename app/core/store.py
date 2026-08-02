@@ -47,6 +47,9 @@ def init() -> None:
         conn.executescript(SCHEMA)
 
 
+init()
+
+
 def now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
