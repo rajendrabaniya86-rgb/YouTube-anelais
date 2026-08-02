@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import textwrap
 from pathlib import Path
@@ -21,6 +22,16 @@ FONT_CANDIDATES = [
 
 class RenderError(RuntimeError):
     pass
+
+
+# The caption fonts carry no emoji glyphs, so emoji would render as tofu boxes.
+EMOJI_RE = re.compile(
+    "[\U0001f000-\U0001faff\U00002600-\U000027bf\U0000fe0f\U00002190-\U000021ff]+"
+)
+
+
+def _clean(text: str) -> str:
+    return re.sub(r"\s{2,}", " ", EMOJI_RE.sub("", text)).strip()
 
 
 def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -53,6 +64,7 @@ def _draw_caption(image_path: Path, caption: str, size: tuple[int, int]) -> None
         frame = img.convert("RGB")
     draw = ImageDraw.Draw(frame, "RGBA")
     draw.rectangle((0, 0, width, height), fill=(0, 0, 0, 90))
+    caption = _clean(caption)
     font = _font(int(width * 0.075))
     lines = textwrap.wrap(caption, width=18) or [caption]
     line_height = int(font.size * 1.25)

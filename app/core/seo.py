@@ -14,6 +14,8 @@ Channel niche: {niche}
 Language for title/description: {language}
 
 Rules:
+- title AND description MUST be written in {language}; only brand names, product names and
+  widely-used English tech terms may stay in English. A fully English title is invalid.
 - title <= 70 chars, front-loads the strongest keyword, curiosity driven, no clickbait lies
 - description: 2-3 sentence hook using keywords, then a bullet summary, then 3-5 hashtags
 - tags: 15-20 lowercase tags mixing broad and long-tail keywords, each <= 30 chars
