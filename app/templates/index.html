@@ -66,20 +66,27 @@
   </section>
 
   <script>
+    const TOKEN = {{ token | tojson }};
+    const auth = TOKEN ? { 'X-Dashboard-Token': TOKEN } : {};
+
     async function run(upload) {
-      await fetch(`/api/run?upload=${upload}`, { method: 'POST' });
+      await fetch(`/api/run?upload=${upload}`, { method: 'POST', headers: auth });
       alert('रन शुरू हो गया — कुछ मिनट बाद पेज रिफ्रेश करें।');
     }
     async function report() {
-      const res = await fetch('/api/report', { method: 'POST' });
+      const res = await fetch('/api/report', { method: 'POST', headers: auth });
       if (res.ok) location.reload(); else alert((await res.json()).error);
     }
     async function keywords() {
       const seed = document.getElementById('seed').value;
-      const res = await fetch(`/api/keywords?seed=${encodeURIComponent(seed)}`);
+      const res = await fetch(`/api/keywords?seed=${encodeURIComponent(seed)}`, { headers: auth });
       const data = await res.json();
-      document.getElementById('kw').innerHTML =
-        data.keywords.map(k => `<li>${k}</li>`).join('');
+      const list = document.getElementById('kw');
+      list.replaceChildren(...data.keywords.map(k => {
+        const li = document.createElement('li');
+        li.textContent = k;
+        return li;
+      }));
     }
   </script>
 </body>

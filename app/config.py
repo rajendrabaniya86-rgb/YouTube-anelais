@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     daily_longs: int = 0
     post_hour_utc: int = 6
     enable_scheduler: bool = True
+    # When set, every request must carry it as ?token= or the X-Dashboard-Token header.
+    dashboard_token: str = ""
 
 
 settings = Settings()

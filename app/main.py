@@ -1,9 +1,10 @@
 import json
+import secrets
 from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from fastapi import BackgroundTasks, FastAPI, Request
+from fastapi import BackgroundTasks, FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -16,6 +17,18 @@ app = FastAPI(title="YT Autopilot")
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 scheduler = BackgroundScheduler(timezone="UTC")
+PUBLIC_PATHS = ("/health", "/static")
+
+
+@app.middleware("http")
+async def require_token(request: Request, call_next):
+    """Shared-secret gate so an exposed dashboard cannot be used to post to the channel."""
+    token = settings.dashboard_token
+    if token and not request.url.path.startswith(PUBLIC_PATHS):
+        provided = request.headers.get("x-dashboard-token") or request.query_params.get("token")
+        if not provided or not secrets.compare_digest(provided, token):
+            return Response("forbidden", status_code=403)
+    return await call_next(request)
 
 
 @app.on_event("startup")
@@ -56,6 +69,7 @@ def dashboard(request: Request):
             "report": store.latest_report(),
             "settings": settings,
             "next_run": next_run,
+            "token": request.query_params.get("token", ""),
         },
     )
 

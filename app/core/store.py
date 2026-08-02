@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 
@@ -36,10 +37,15 @@ CREATE TABLE IF NOT EXISTS runs (
 """
 
 
-def _conn() -> sqlite3.Connection:
+@contextmanager
+def _conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def init() -> None:

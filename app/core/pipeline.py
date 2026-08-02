@@ -22,6 +22,9 @@ def produce(kind: str, upload: bool = True) -> dict:
         return result
     try:
         thumb = video.make_thumbnail(meta["title"], kind, slug)
+    except Exception:  # a custom thumbnail is optional, never block the upload
+        thumb = None
+    try:
         video_id = youtube.upload(path, meta, kind, thumb)
         store.mark_uploaded(row_id, video_id)
         result["video_id"] = video_id
