@@ -119,7 +119,7 @@ for update to authenticated using (owner_id = auth.uid()) with check (owner_id =
 create policy "shop owner manages own customers" on public.customers
 for all to authenticated
 using (public.is_shop_owner(shop_id))
-with check (public.is_shop_owner(shop_id) and created_by = auth.uid() and exists (select 1 from public.customers c where c.id = customer_id and c.shop_id = ledger_entries.shop_id));
+with check (public.is_shop_owner(shop_id) and created_by = auth.uid());
 
 create policy "shop owner reads own ledger" on public.ledger_entries
 for select to authenticated using (public.is_shop_owner(shop_id));
