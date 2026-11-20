@@ -61,6 +61,7 @@ create table if not exists public.audit_events (
   created_at timestamptz not null default now()
 );
 
+create unique index if not exists customers_shop_id_id_uidx on public.customers(shop_id,id);
 create index if not exists customers_shop_idx on public.customers(shop_id);
 create index if not exists ledger_shop_customer_time_idx on public.ledger_entries(shop_id, customer_id, created_at desc);
 create index if not exists consents_customer_purpose_idx on public.customer_consents(customer_id, purpose);
@@ -118,7 +119,7 @@ for update to authenticated using (owner_id = auth.uid()) with check (owner_id =
 create policy "shop owner manages own customers" on public.customers
 for all to authenticated
 using (public.is_shop_owner(shop_id))
-with check (public.is_shop_owner(shop_id) and created_by = auth.uid());
+with check (public.is_shop_owner(shop_id) and created_by = auth.uid() and exists (select 1 from public.customers c where c.id = customer_id and c.shop_id = ledger_entries.shop_id));
 
 create policy "shop owner reads own ledger" on public.ledger_entries
 for select to authenticated using (public.is_shop_owner(shop_id));
