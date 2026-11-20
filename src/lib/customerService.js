@@ -23,3 +23,27 @@ export async function addLedgerEntry(shopId,userId,customerId,input) {
  const {data,error}=await supabase.from('ledger_entries').insert({shop_id:shopId,customer_id:customerId,created_by:userId,entry_type:input.type,amount,note:(input.note||'').trim()}).select('id,shop_id,customer_id,entry_type,amount,note,created_at').single();
  if(error) throw error; return data;
 }
+
+export async function listPaymentReminders(shopId) {
+ const {data,error}=await supabase.from('payment_reminders')
+  .select('id,shop_id,customer_id,ledger_entry_id,due_at,message,status,created_at,completed_at')
+  .eq('shop_id',shopId).order('due_at',{ascending:true});
+ if(error) throw error; return data||[];
+}
+export async function addPaymentReminder(shopId,userId,customerId,input) {
+ if(!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
+ const dueAt=new Date(input.dueAt);
+ if(!Number.isFinite(dueAt.getTime())||dueAt.getTime()<=Date.now()) throw new Error('भविष्य की सही तारीख और समय चुनें।');
+ const {data,error}=await supabase.from('payment_reminders').insert({
+  shop_id:shopId,created_by:userId,customer_id:customerId,
+  due_at:dueAt.toISOString(),message:(input.message||'').trim()
+ }).select('id,shop_id,customer_id,due_at,message,status,created_at,completed_at').single();
+ if(error) throw error; return data;
+}
+export async function updatePaymentReminder(id,status) {
+ if(!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
+ const patch={status,completed_at:status==='completed'?new Date().toISOString():null};
+ const {data,error}=await supabase.from('payment_reminders').update(patch).eq('id',id)
+  .select('id,shop_id,customer_id,due_at,message,status,created_at,completed_at').single();
+ if(error) throw error; return data;
+}
