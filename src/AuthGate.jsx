@@ -15,17 +15,25 @@ export default function AuthGate({ children }) {
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    let mounted = true;
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return;
+      if (error) setMessage('लॉगिन स्थिति जाँची नहीं जा सकी। दोबारा प्रयास करें।');
+      setSession(data?.session || null);
+      setLoading(false);
+    }).catch(() => {
+      if (!mounted) return;
+      setMessage('इंटरनेट या लॉगिन सेवा में समस्या है।');
       setLoading(false);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
-    return () => listener.subscription.unsubscribe();
+    return () => { mounted = false; listener.subscription.unsubscribe(); };
   }, []);
 
   async function submit(e) {
     e.preventDefault();
     setMessage('');
+    if (!supabase || !hasSupabaseConfig) return setMessage('Supabase कनेक्ट नहीं है। अभी डेमो मोड इस्तेमाल करें।');
     if (password.length < 8) return setMessage('पासवर्ड कम से कम 8 अक्षर का रखें।');
     if (mode === 'signup') {
       if (!name.trim() || !shop.trim()) return setMessage('अपना नाम और दुकान का नाम भरें।');
