@@ -11,3 +11,13 @@ export async function addCustomer(shopId,userId,input) {
  const {data,error}=await supabase.from('customers').insert({shop_id:shopId,created_by:userId,display_name:input.name.trim(),phone:input.phone.trim()||null,notes:input.notes.trim()||null}).select('id,shop_id,display_name,phone,notes,created_at').single();
  if(error) throw error; return data;
 }
+export async function listLedgerEntries(shopId) {
+ const {data,error}=await supabase.from('ledger_entries').select('id,shop_id,customer_id,entry_type,amount,note,created_at').eq('shop_id',shopId).order('created_at',{ascending:false});
+ if(error) throw error; return data||[];
+}
+export async function addLedgerEntry(shopId,userId,customerId,input) {
+ if(!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
+ const amount=Number(input.amount); if(!Number.isFinite(amount)||amount<=0) throw new Error('रकम शून्य से अधिक होनी चाहिए।');
+ const {data,error}=await supabase.from('ledger_entries').insert({shop_id:shopId,customer_id:customerId,created_by:userId,entry_type:input.type,amount,note:(input.note||'').trim()}).select('id,shop_id,customer_id,entry_type,amount,note,created_at').single();
+ if(error) throw error; return data;
+}
