@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowRight, ShieldCheck, Store } from 'lucide-react';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
 
@@ -42,8 +42,8 @@ export default function AuthGate({ children }) {
   }
 
   if (loading) return <div className="auth-loading">सुरक्षित लॉगिन जाँचा जा रहा है…</div>;
-  if (session) return <>{children}<button className="signout-fab" onClick={() => supabase.auth.signOut()}>लॉग आउट</button></>;
-  if (demo) return <>{children}<div className="demo-banner">डेमो मोड: नमूना डेटा ही दिखाया जा रहा है। <button onClick={() => setDemo(false)}>लॉगिन पर लौटें</button></div></>;
+  if (session) return <>{React.cloneElement(children, { mode: 'live', user: session.user })}<button className="signout-fab" onClick={() => supabase.auth.signOut()}>लॉग आउट</button></>;
+  if (demo) return <>{React.cloneElement(children, { mode: 'demo', user: null })}<div className="demo-banner">डेमो मोड: नमूना डेटा ही दिखाया जा रहा है। <button onClick={() => setDemo(false)}>लॉगिन पर लौटें</button></div></>;
 
   return <main className="auth-screen">
     <section className="auth-card">
