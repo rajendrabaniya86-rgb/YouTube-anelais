@@ -13,6 +13,7 @@ Use a separate test Supabase project and synthetic records only.
    - supabase/migrations/005_customer_account_foundation.sql
    - supabase/migrations/006_protect_account_type.sql
    - supabase/migrations/007_customer_link_invites.sql
+   - supabase/migrations/008_customer_link_claims.sql
 5. In Authentication → URL Configuration, set the local and deployed redirect URLs.
 6. In Authentication → Providers, enable Email. Configure email confirmation before public use.
 7. Run npm install and npm run dev.
@@ -48,3 +49,17 @@ supabase functions deploy create-customer-link-invite
 ```
 
 The Supabase Edge Function runtime supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Never copy the service-role key into the app, browser, GitHub source, or chat. The function does not redeem codes, verify identity, create a customer link, or reveal ledger information. Do not share real customer information; use synthetic records while testing.
+
+
+## Customer invitation redemption (migration 008)
+
+Apply `supabase/migrations/008_customer_link_claims.sql` after migration 007. Then deploy both Edge Functions:
+
+```sh
+supabase functions deploy create-customer-link-invite
+supabase functions deploy redeem-customer-link-invite
+```
+
+The redemption function accepts a code only from an authenticated customer account. The database atomically marks the invitation as used and creates a private pending claim. Unknown, expired, revoked, and previously redeemed codes receive the same generic error. The claim table is inaccessible to browser roles.
+
+A successful redemption is **not approval**. It does not link the account, show balances, or expose ledger rows. Identity verification, shop-side review, dispute handling, and a separate secure approval flow remain unimplemented. Use synthetic records only.
