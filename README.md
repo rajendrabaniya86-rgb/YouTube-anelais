@@ -8,7 +8,7 @@ This branch contains a working frontend prototype and an in-progress Supabase ba
 
 - Shop-owner signup/login UI (requires Supabase configuration).
 - Demo customer records, credit/payment entries, statements, reports, CSV export, and in-app reminders.
-- Supabase schema and row-level security migrations 001–010 for shop-scoped records.
+- Supabase schema and row-level security migrations 001–012 for shop-scoped records.
 - IndexedDB storage for offline ledger drafts.
 - An idempotent server-side upload helper and database uniqueness migration for safe retry handling.
 
