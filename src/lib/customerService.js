@@ -91,6 +91,26 @@ export async function listPendingCustomerClaims(shopId) {
 }
 
 
+ 
+/** Review a pending claim. The database verifies the signed-in shop owner. */
+export async function reviewCustomerLinkClaim(claimId, decision, reviewNote = '') {
+ if (!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
+ if (!claimId || !['approved', 'rejected'].includes(decision)) {
+  throw new Error('अनुरोध या निर्णय सही नहीं है।');
+ }
+ const { data, error } = await supabase.rpc('review_customer_link_claim', {
+  p_claim_id: claimId,
+  p_decision: decision,
+  p_review_note: String(reviewNote || '').slice(0, 500)
+ });
+ if (error) throw error;
+ if (!data || data.id !== claimId || data.status !== decision || data.ledger_access_granted !== false) {
+  throw new Error('सर्वर से सुरक्षित समीक्षा की पुष्टि नहीं मिली।');
+ }
+ return data;
+}
+
+
 /** Create a one-time customer invitation. The raw code is returned once only. */
 export async function createCustomerLinkInvite(shopId, customerId, expiresInHours = 24) {
  if (!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
