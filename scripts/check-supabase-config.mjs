@@ -15,6 +15,7 @@ const requiredMigrations = [
   '011_atomic_invites_and_policy_tuning.sql',
   '012_payment_reminder_fk_index.sql',
   '013_invoker_shop_owner_helper.sql',
+  '014_customer_consent_write_lockdown.sql',
 ];
 const requiredFunctions = [
   'create-customer-link-invite',
