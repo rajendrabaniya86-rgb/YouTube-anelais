@@ -179,11 +179,16 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   });
   assert(!concurrentInvite.error && typeof concurrentInvite.data?.inviteCode === 'string',
     'Shop owner can create an invite for concurrent-redemption testing');
+  // Use a fresh synthetic customer identity: the primary customer already
+  // has a pending claim from the earlier single-redemption test, which would
+  // make both concurrent requests fail before testing invite race behavior.
+  const concurrentCustomer = await createUser('customer', '', 'concurrent-customer');
+  const concurrentClient = await asUser(concurrentCustomer);
   const concurrentResults = await Promise.all([
-    clientCustomer.functions.invoke('redeem-customer-link-invite', {
+    concurrentClient.functions.invoke('redeem-customer-link-invite', {
       body: { inviteCode: concurrentInvite.data.inviteCode },
     }),
-    clientCustomer.functions.invoke('redeem-customer-link-invite', {
+    concurrentClient.functions.invoke('redeem-customer-link-invite', {
       body: { inviteCode: concurrentInvite.data.inviteCode },
     }),
   ]);
