@@ -1,0 +1,2 @@
+[functions.create-customer-link-invite]
+verify_jwt = true
