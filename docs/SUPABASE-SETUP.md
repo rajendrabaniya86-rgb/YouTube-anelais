@@ -26,3 +26,10 @@ Use a separate test Supabase project and synthetic records only.
 - Test interrupted requests and retry behaviour before relying on idempotency. Migration 004 adds the unique client_ref index used by sync.
 - No Supabase project or credentials are configured by this code change, and no live database migration has been verified here.
 - Obtain adult oversight and appropriate legal/security review before any real-world use.
+
+
+## Customer account foundation (migration 005)
+
+Migration 005 adds a `profiles.account_type` label and lets signup create a customer account without creating a shop. The label is for interface routing only. It is not proof of identity and must never be used as authorization. Existing shop-owner RLS remains the data boundary.
+
+Customer accounts currently see a clear placeholder screen. They cannot link customer records, read shop ledgers, grant sharing permissions, or view another shop's data. Those features require a separately verified account-linking and customer-controlled consent implementation. Apply migration 005 after migration 004 before testing customer signup. Test with synthetic accounts only.
