@@ -107,3 +107,17 @@ export async function createCustomerLinkInvite(shopId, customerId, expiresInHour
  }
  return data;
 }
+
+
+/** Redeem a one-time invitation as the authenticated customer account. */
+export async function redeemCustomerLinkInvite(inviteCode) {
+ if (!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
+ const code=String(inviteCode||'').trim();
+ if (!/^[A-Za-z0-9_-]{40,50}$/.test(code)) throw new Error('निमंत्रण कोड सही प्रारूप में लिखें।');
+ const { data, error } = await supabase.functions.invoke('redeem-customer-link-invite', {
+  body: { inviteCode: code }
+ });
+ if (error) throw error;
+ if (data?.status !== 'pending') throw new Error(data?.error || 'अनुरोध जमा नहीं हो सका।');
+ return data;
+}
