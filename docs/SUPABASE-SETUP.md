@@ -12,6 +12,7 @@ Use a separate test Supabase project and synthetic records only.
    - supabase/migrations/004_ledger_offline_idempotency.sql
    - supabase/migrations/005_customer_account_foundation.sql
    - supabase/migrations/006_protect_account_type.sql
+   - supabase/migrations/007_customer_link_invites.sql
 5. In Authentication → URL Configuration, set the local and deployed redirect URLs.
 6. In Authentication → Providers, enable Email. Configure email confirmation before public use.
 7. Run npm install and npm run dev.
