@@ -2,10 +2,14 @@
 
 Use a separate test Supabase project and synthetic records only.
 
-1. Create a Supabase project in your own account.
-2. In Project Settings → API, copy the Project URL and publishable/anon key.
-3. Locally copy .env.example to .env.local and fill in those two values.
-4. In Supabase SQL Editor, apply these migrations in this exact order:
+1. Create a dedicated **test** Supabase project in an account controlled by the project owner. Use synthetic records only.
+2. Install the Supabase CLI and sign in locally with `supabase login`. Do not share the access token.
+3. Copy the project reference from Project Settings → General. Link this repository with `supabase link --project-ref YOUR_PROJECT_REF`.
+4. In Project Settings → API, copy the Project URL and publishable/anon key. Locally copy `.env.example` to `.env.local` and fill in only those two browser-safe values.
+5. Run `npm install`, `npm run check:supabase`, and `npm run build` before deploying.
+6. Preview the pending database changes with `supabase db push --dry-run`. If the target is the new empty test project and the migration list is correct, apply with `supabase db push`.
+7. Confirm the remote migration history contains all eight migrations before deploying functions.
+8. Deploy the Edge Functions in this order:
    - supabase/migrations/001_initial_schema.sql
    - supabase/migrations/002_security_hardening.sql
    - supabase/migrations/003_payment_reminders.sql
@@ -14,9 +18,9 @@ Use a separate test Supabase project and synthetic records only.
    - supabase/migrations/006_protect_account_type.sql
    - supabase/migrations/007_customer_link_invites.sql
    - supabase/migrations/008_customer_link_claims.sql
-5. In Authentication → URL Configuration, set the local and deployed redirect URLs.
-6. In Authentication → Providers, enable Email. Configure email confirmation before public use.
-7. Run npm install and npm run dev.
+9. In Authentication → URL Configuration, set the exact local and deployed redirect URLs.
+10. In Authentication → Providers, enable Email and keep email confirmation enabled for testing.
+11. Run `npm run dev` locally and test with two separate synthetic shop-owner accounts plus one customer account.
 
 ## Important security and testing notes
 
@@ -58,3 +62,46 @@ The list function requires a signed-in shop owner and verifies ownership of the 
 A successful redemption is **not approval**. It does not link the account, show balances, or expose ledger rows. This endpoint is a read-only review list; approval/rejection, identity verification, dispute handling, and a separate secure approval flow remain unimplemented. Use synthetic records only.
 
 The Supabase Edge Function runtime supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Never copy the service-role key into the app, browser, GitHub source, or chat.
+
+
+## Deployment preflight and verification (task 11)
+
+The repository includes a repeatable static preflight:
+
+```sh
+npm run check:supabase
+npm run build
+```
+
+The preflight checks that all eight expected migration files are present, that no unexpected SQL migration is silently added to this reviewed deployment set, that all three Edge Functions exist with JWT verification enabled, and that service-role credential names do not appear in browser source or the browser environment example. GitHub Actions runs this preflight before the production build.
+
+After linking a dedicated test project, use:
+
+```sh
+supabase migration list
+supabase db push --dry-run
+supabase db push
+supabase migration list
+supabase functions deploy create-customer-link-invite
+supabase functions deploy redeem-customer-link-invite
+supabase functions deploy list-customer-link-claims
+supabase functions list
+```
+
+Do not use `--include-all` to force migrations into a project with unknown history. Stop if the remote migration history differs from the expected eight files and review it first. Do not run these commands against a production database during initial testing.
+
+### Live acceptance checklist
+
+- [ ] Two separate synthetic shop-owner accounts can only read their own shops/customers/ledger.
+- [ ] A customer account cannot read shops, customers, balances, or ledger rows directly.
+- [ ] A shop owner can create an invitation only for a customer record in their own shop.
+- [ ] The raw invitation code is shown once; only its SHA-256 hash is stored.
+- [ ] An unauthenticated request is rejected by each Edge Function.
+- [ ] A shop owner cannot redeem a customer invitation.
+- [ ] A customer can redeem a valid invitation once and receives only a pending claim.
+- [ ] Expired, unknown, and reused codes fail with the same generic response.
+- [ ] A second shop owner cannot list another shop's pending claims.
+- [ ] Pending claims contain no balance, note, or ledger data.
+- [ ] No request path grants ledger access merely because a claim is pending.
+
+A static CI pass is not a live Supabase security test. Do not describe the system as production-secure until these checks have been run against the actual test project and reviewed.
