@@ -7,8 +7,8 @@ Use a separate test Supabase project and synthetic records only.
 3. Copy the project reference from Project Settings → General. Link this repository with `supabase link --project-ref YOUR_PROJECT_REF`.
 4. In Project Settings → API, copy the Project URL and publishable/anon key. Locally copy `.env.example` to `.env.local` and fill in only those two browser-safe values.
 5. Run `npm install`, `npm run check:supabase`, and `npm run build` before deploying.
-6. Preview the pending database changes with `supabase db push --dry-run`. If the target is the new empty test project and the migration list is correct, apply with `supabase db push`. This applies the ten SQL migrations in filename order; do not paste or deploy them as Edge Functions.
-7. Confirm the remote migration history contains all ten migrations with `supabase migration list`.
+6. Preview the pending database changes with `supabase db push --dry-run`. If the target is the new empty test project and the migration list is correct, apply with `supabase db push`. This applies the twelve SQL migrations in filename order; do not paste or deploy them as Edge Functions.
+7. Confirm the remote migration history contains all twelve migrations with `supabase migration list`.
 8. Deploy the three Edge Functions only after the database migrations succeed:
    - `supabase functions deploy create-customer-link-invite`
    - `supabase functions deploy redeem-customer-link-invite`
@@ -38,7 +38,7 @@ Customer accounts can redeem an invitation and submit a pending claim after migr
 
 ## Customer link invitation function (migration 007)
 
-The Edge Function `create-customer-link-invite` creates a one-time code for a customer record. It verifies the caller's session, checks shop ownership and customer/shop matching with the caller's JWT, limits each owner to 10 code creations per hour, stores only a SHA-256 hash, and returns the raw code once. Codes expire after a selected 1–72 hours (24 by default).
+Migration 011 makes the per-owner hourly invitation limit atomic under concurrent requests and adds server-side audit triggers. Migration 012 adds the missing composite foreign-key index for reminders.\n\nThe Edge Function `create-customer-link-invite` creates a one-time code for a customer record. It verifies the caller's session, checks shop ownership and customer/shop matching with the caller's JWT, enforces an atomic limit of 10 code creations per owner per hour, stores only a SHA-256 hash, and returns the raw code once. Codes expire after a selected 1–72 hours (24 by default).
 
 ## Customer invitation redemption and pending claims (migration 008)
 
@@ -59,7 +59,7 @@ A successful redemption is **not approval**. It does not link the account, show 
 The Supabase Edge Function runtime supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Never copy the service-role key into the app, browser, GitHub source, or chat.
 
 
-## Deployment preflight and verification (task 11)
+## Deployment preflight and verification (tasks 11–12)
 
 The repository includes a repeatable static preflight:
 
@@ -68,7 +68,7 @@ npm run check:supabase
 npm run build
 ```
 
-The preflight checks that all ten expected migration files are present, that no unexpected SQL migration is silently added to this reviewed deployment set, that all three Edge Functions exist with JWT verification enabled, and that service-role credential names do not appear in browser source or the browser environment example. GitHub Actions runs this preflight before the production build.
+The preflight checks that all twelve expected migration files are present, that no unexpected SQL migration is silently added to this reviewed deployment set, that all three Edge Functions exist with JWT verification enabled, and that service-role credential names do not appear in browser source or the browser environment example. GitHub Actions runs this preflight before the production build.
 
 After linking a dedicated test project, use:
 
@@ -83,7 +83,7 @@ supabase functions deploy list-customer-link-claims
 supabase functions list
 ```
 
-Do not use `--include-all` to force migrations into a project with unknown history. Stop if the remote migration history differs from the expected ten files and review it first. Do not run these commands against a production database during initial testing.
+Do not use `--include-all` to force migrations into a project with unknown history. Stop if the remote migration history differs from the expected twelve files and review it first. Do not run these commands against a production database during initial testing.
 
 ### Live acceptance checklist
 
