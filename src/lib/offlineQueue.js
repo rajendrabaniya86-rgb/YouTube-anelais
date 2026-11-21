@@ -92,10 +92,27 @@ export async function removeOfflineLedgerDraft(id, userId, shopId) {
   if (!id || !userId || !shopId) return false;
   const db = await openDb();
   try {
-    const row = await runTransaction(db, 'readonly', store => store.get(id), 'ड्राफ्ट जाँचा नहीं जा सका।');
-    if (!row || row.userId !== userId || row.shopId !== shopId) return false;
-    await runTransaction(db, 'readwrite', store => store.delete(id), 'सिंक हुआ ड्राफ्ट हटाया नहीं जा सका।');
-    return true;
+    // Verify scope and delete in one read-write transaction to avoid a check/delete race.
+    return await new Promise((resolve, reject) => {
+      let removed = false;
+      try {
+        const tx = db.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        const request = store.get(id);
+        request.onsuccess = () => {
+          const row = request.result;
+          if (!row || row.userId !== userId || row.shopId !== shopId) return;
+          store.delete(id);
+          removed = true;
+        };
+        request.onerror = () => reject(request.error || new Error('ड्राफ्ट जाँचा नहीं जा सका।'));
+        tx.oncomplete = () => resolve(removed);
+        tx.onerror = () => reject(tx.error || new Error('सिंक हुआ ड्राफ्ट हटाया नहीं जा सका।'));
+        tx.onabort = () => reject(tx.error || new Error('सिंक हुआ ड्राफ्ट हटाया नहीं जा सका।'));
+      } catch (error) {
+        reject(error);
+      }
+    });
   } finally {
     db.close();
   }
