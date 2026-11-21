@@ -27,7 +27,7 @@ Use a separate test Supabase project and synthetic records only.
 - Test Row Level Security with at least two separate test shop-owner accounts and verify neither account can read or write the other's records.
 - The offline queue is stored in IndexedDB and is not encrypted by this app. Do not put real financial or identity information in it. Avoid shared devices.
 - Test interrupted requests and retry behaviour before relying on idempotency. Migration 004 adds the unique client_ref index used by sync.
-- No Supabase project or credentials are configured by this code change, and no live database migration has been verified here.
+- The dedicated test Supabase project has migrations 001–012 applied. Browser credentials are not committed to the repository. Authenticated end-to-end tests have not yet been completed.
 - Obtain adult oversight and appropriate legal/security review before any real-world use.
 
 ## Customer account foundation (migration 005)
