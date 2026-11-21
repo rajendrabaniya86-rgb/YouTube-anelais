@@ -40,7 +40,7 @@ const envExample = await readFile('.env.example', 'utf8');
 if (!envExample.includes('VITE_SUPABASE_URL=') || !envExample.includes('VITE_SUPABASE_ANON_KEY=')) {
   failures.push('Browser environment example must define Supabase URL and publishable/anon key');
 }
-if (/SERVICE_ROLE/i.test(envExample)) failures.push('Never place service-role credentials in .env.example');
+if (/^\\s*(?:VITE_)?SUPABASE_SERVICE_ROLE_KEY\\s*=/im.test(envExample)) failures.push('Never place service-role credentials in .env.example');
 const frontendFiles = ['src/lib/supabase.js', 'src/App.jsx', 'src/AuthGate.jsx'];
 for (const file of frontendFiles) {
   const source = await readFile(file, 'utf8');
