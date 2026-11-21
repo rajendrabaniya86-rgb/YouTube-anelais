@@ -33,12 +33,7 @@ npm run dev
 
 ## Supabase setup
 
-Follow [docs/SUPABASE-SETUP.md](docs/SUPABASE-SETUP.md). Apply migrations in numeric order:
-
-1. `supabase/migrations/001_initial_schema.sql`
-2. `supabase/migrations/002_security_hardening.sql`
-3. `supabase/migrations/003_payment_reminders.sql`
-4. `supabase/migrations/004_ledger_offline_idempotency.sql`
+Follow [docs/SUPABASE-SETUP.md](docs/SUPABASE-SETUP.md). Apply all twelve SQL migrations in `supabase/migrations/` in numeric order (001–012). Migration 011 adds atomic invitation throttling and trusted audit triggers; migration 012 adds the reminder foreign-key index.
 
 Only use a Supabase publishable/anon key in the browser. Never expose a service-role key.
 
