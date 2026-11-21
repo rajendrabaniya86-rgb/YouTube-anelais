@@ -69,6 +69,86 @@ revoke all on function public.create_customer_link_invite_atomic(uuid, uuid, uui
 grant execute on function public.create_customer_link_invite_atomic(uuid, uuid, uuid, bytea, timestamptz)
   to service_role;
 
+-- Audit events are written only by this trusted trigger, never by browser clients.
+create or replace function public.write_audit_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  row_data jsonb;
+  event_shop_id uuid;
+  event_actor_id uuid;
+  event_entity_id uuid;
+  event_entity_type text;
+begin
+  if TG_OP = 'DELETE' then
+    row_data := to_jsonb(OLD);
+  else
+    row_data := to_jsonb(NEW);
+  end if;
+
+  event_entity_id := nullif(row_data->>'id', '')::uuid;
+  event_entity_type := TG_TABLE_NAME;
+  event_shop_id := nullif(row_data->>'shop_id', '')::uuid;
+  if event_shop_id is null and TG_TABLE_NAME = 'shops' then
+    event_shop_id := event_entity_id;
+  end if;
+
+  event_actor_id := auth.uid();
+  if event_actor_id is null then
+    event_actor_id := coalesce(
+      nullif(row_data->>'created_by', '')::uuid,
+      nullif(row_data->>'recorded_by', '')::uuid,
+      nullif(row_data->>'customer_user_id', '')::uuid,
+      nullif(row_data->>'owner_id', '')::uuid,
+      nullif(row_data->>'reviewed_by', '')::uuid
+    );
+  end if;
+
+  if event_shop_id is null or event_actor_id is null or event_entity_id is null then
+    raise exception 'Audit context missing; operation rejected';
+  end if;
+
+  insert into public.audit_events(shop_id, actor_id, entity_type, entity_id, action)
+  values (event_shop_id, event_actor_id, event_entity_type, event_entity_id, lower(TG_OP));
+
+  if TG_OP = 'DELETE' then return OLD; end if;
+  return NEW;
+end;
+$;
+
+revoke all on function public.write_audit_event() from public, anon, authenticated;
+
+drop trigger if exists audit_shops_write on public.shops;
+create trigger audit_shops_write after insert or update on public.shops
+for each row execute function public.write_audit_event();
+
+drop trigger if exists audit_customers_write on public.customers;
+create trigger audit_customers_write after insert or update or delete on public.customers
+for each row execute function public.write_audit_event();
+
+drop trigger if exists audit_ledger_entries_write on public.ledger_entries;
+create trigger audit_ledger_entries_write after insert on public.ledger_entries
+for each row execute function public.write_audit_event();
+
+drop trigger if exists audit_customer_consents_write on public.customer_consents;
+create trigger audit_customer_consents_write after insert or update on public.customer_consents
+for each row execute function public.write_audit_event();
+
+drop trigger if exists audit_payment_reminders_write on public.payment_reminders;
+create trigger audit_payment_reminders_write after insert or update on public.payment_reminders
+for each row execute function public.write_audit_event();
+
+drop trigger if exists audit_customer_link_invites_write on public.customer_link_invites;
+create trigger audit_customer_link_invites_write after insert or update on public.customer_link_invites
+for each row execute function public.write_audit_event();
+
+drop trigger if exists audit_customer_link_claims_write on public.customer_link_claims;
+create trigger audit_customer_link_claims_write after insert or update on public.customer_link_claims
+for each row execute function public.write_audit_event();
+
 -- Avoid per-row repeated auth context lookups in RLS predicates.
 drop policy if exists "profile owner can read own profile" on public.profiles;
 create policy "profile owner can read own profile" on public.profiles
