@@ -148,7 +148,7 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
     'Shop owner can create an invite for expiry testing');
   const expiredDigest = createHash('sha256').update(expiredInvite.data.inviteCode).digest('hex');
   const expiredRow = await must(admin.from('customer_link_invites').select('id')
-    .eq('created_by', ownerA.id).eq('token_hash', `\\\\x${expiredDigest}`).single(),
+    .eq('created_by', ownerA.id).eq('token_hash', `\\x${expiredDigest}`).single(),
     'find synthetic expiry-test invite');
   await must(admin.from('customer_link_invites').update({ expires_at: new Date(Date.now() - 60_000).toISOString() })
     .eq('id', expiredRow.id).select('id').single(), 'expire synthetic invite');
@@ -164,7 +164,7 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
     'Shop owner can create an invite for revocation testing');
   const revokedDigest = createHash('sha256').update(revokedInvite.data.inviteCode).digest('hex');
   const revokedRow = await must(admin.from('customer_link_invites').select('id')
-    .eq('created_by', ownerA.id).eq('token_hash', `\\\\x${revokedDigest}`).single(),
+    .eq('created_by', ownerA.id).eq('token_hash', `\\x${revokedDigest}`).single(),
     'find synthetic revocation-test invite');
   await must(admin.from('customer_link_invites').update({ revoked_at: new Date().toISOString() })
     .eq('id', revokedRow.id).select('id').single(), 'revoke synthetic invite');
