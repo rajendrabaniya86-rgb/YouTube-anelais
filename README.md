@@ -8,7 +8,7 @@ This branch contains a working frontend prototype and an in-progress Supabase ba
 
 - Shop-owner signup/login UI (requires Supabase configuration).
 - Demo customer records, credit/payment entries, statements, reports, CSV export, and in-app reminders.
-- Supabase schema and row-level security migrations for shop-scoped records.
+- Supabase schema and row-level security migrations 001–010 for shop-scoped records.
 - IndexedDB storage for offline ledger drafts.
 - An idempotent server-side upload helper and database uniqueness migration for safe retry handling.
 
@@ -20,8 +20,8 @@ This is **not production-ready** and must use fake test data only until reviewed
 - SQL migrations must be applied manually in order and tested against two separate test shop accounts.
 - Offline drafts can be saved locally, reviewed in the pending-drafts screen, and synced manually when online. The queue is not encrypted, and live sync still requires migration 004 plus a configured Supabase project.
 - Browser IndexedDB data is not encrypted by this app.
-- Customer self-service, verified consent, cross-shop sharing, dispute workflow, notifications, and AI summaries are not implemented as production features.
-- No real-device offline test, live Supabase integration test, penetration test, or end-to-end acceptance test has been completed.
+- Customer self-service approval, verified consent, cross-shop sharing, dispute workflow, automated notifications, and AI summaries are not implemented as production features. Invitation redemption currently creates only a pending claim.
+- No authenticated multi-shop RLS test, real-device offline test, complete live Supabase end-to-end test, penetration test, or end-to-end acceptance test has been completed.
 - A successful hosting build does not prove database or security behavior.
 
 ## Run locally
