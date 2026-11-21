@@ -26,8 +26,8 @@ async function must(promise, label) {
   if (result.error) throw new Error(`${label}: ${result.error.message}`);
   return result.data;
 }
-async function createUser(role, shopName = '') {
-  const email = `gtn-${tag}-${role}@example.com`;
+async function createUser(role, shopName = '', uniqueLabel = role) {
+  const email = `gtn-${tag}-${uniqueLabel}@example.com`;
   const data = await must(admin.auth.admin.createUser({
     email, password, email_confirm: true,
     user_metadata: { full_name: `Synthetic ${role}`, account_type: role === 'customer' ? 'customer' : 'shop_owner', ...(shopName ? { shop_name: shopName } : {}) },
@@ -45,8 +45,8 @@ async function visibleIds(client, table, id) {
   const data = await must(client.from(table).select('id').eq('id', id), `read ${table}`);
   return data.map(row => row.id);
 }
-const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`);
-  const ownerB = await createUser('shop_owner', `Synthetic Shop B ${tag}`);
+const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-owner-a');
+  const ownerB = await createUser('shop_owner', `Synthetic Shop B ${tag}`, 'shop-owner-b');
   const customer = await createUser('customer');
 
   const shops = await must(admin.from('shops').select('id, owner_id').in('owner_id', [ownerA.id, ownerB.id]), 'load synthetic shops');
