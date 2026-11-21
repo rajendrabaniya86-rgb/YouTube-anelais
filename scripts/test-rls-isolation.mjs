@@ -80,6 +80,74 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   assert((await visibleIds(clientCustomer, 'customers', customerA.id)).length === 0, 'Customer cannot read Shop A customer record');
   assert((await visibleIds(clientCustomer, 'customers', customerB.id)).length === 0, 'Customer cannot read Shop B customer record');
 
+  // Exercise the real Edge Function boundary with synthetic JWT sessions.
+  const inviteResult = await clientA.functions.invoke('create-customer-link-invite', {
+    body: { shopId: shopA, customerId: customerA.id, expiresInHours: 1 },
+  });
+  assert(!inviteResult.error && typeof inviteResult.data?.inviteCode === 'string',
+    'Shop owner can create a valid one-time invite through the Edge Function');
+  const inviteCode = inviteResult.data?.inviteCode;
+
+  const wrongShopInvite = await clientA.functions.invoke('create-customer-link-invite', {
+    body: { shopId: shopB, customerId: customerB.id, expiresInHours: 1 },
+  });
+  assert(Boolean(wrongShopInvite.error),
+    'Shop A cannot create an invite for Shop B');
+
+  const ownerRedeemAttempt = await clientA.functions.invoke('redeem-customer-link-invite', {
+    body: { inviteCode },
+  });
+  assert(Boolean(ownerRedeemAttempt.error),
+    'Shop owner account cannot redeem a customer invite');
+
+  const customerRedeem = await clientCustomer.functions.invoke('redeem-customer-link-invite', {
+    body: { inviteCode },
+  });
+  assert(!customerRedeem.error && customerRedeem.data?.status === 'pending',
+    'Customer can redeem a valid invite into pending status');
+
+  const repeatRedeem = await clientCustomer.functions.invoke('redeem-customer-link-invite', {
+    body: { inviteCode },
+  });
+  assert(Boolean(repeatRedeem.error),
+    'A redeemed invite cannot be reused');
+
+  const claimCount = await must(
+    admin.from('customer_link_claims')
+      .select('id', { count: 'exact', head: true })
+      .eq('customer_id', customerA.id)
+      .eq('customer_user_id', customer.id)
+      .eq('status', 'pending'),
+    'count synthetic pending claims',
+  );
+  assert(claimCount.count === 1,
+    'Repeated redemption creates only one pending claim');
+
+  const ownerClaims = await clientA.functions.invoke('list-customer-link-claims', {
+    body: { shopId: shopA },
+  });
+  assert(!ownerClaims.error && Array.isArray(ownerClaims.data?.claims) &&
+    ownerClaims.data.claims.some((claim) => claim.customer?.displayName === `Synthetic Customer A ${tag}`),
+    'Shop owner can list its own pending claims');
+
+  const crossShopClaims = await clientB.functions.invoke('list-customer-link-claims', {
+    body: { shopId: shopA },
+  });
+  assert(Boolean(crossShopClaims.error),
+    'Shop B cannot list Shop A pending claims');
+
+  const customerListClaims = await clientCustomer.functions.invoke('list-customer-link-claims', {
+    body: { shopId: shopA },
+  });
+  assert(Boolean(customerListClaims.error),
+    'Customer account cannot list shop-owner pending claims');
+
+  const invalidRedeem = await clientCustomer.functions.invoke('redeem-customer-link-invite', {
+    body: { inviteCode: 'not-a-valid-invite' },
+  });
+  assert(Boolean(invalidRedeem.error),
+    'Malformed invite codes are rejected');
+
   const consentAttempt = await clientA.from('customer_consents').insert({
     shop_id: shopA, customer_id: customerA.id, purpose: 'automated-test-only',
     evidence_note: 'Synthetic test must be rejected', recorded_by: ownerA.id,
