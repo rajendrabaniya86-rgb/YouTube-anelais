@@ -12,6 +12,7 @@ const requiredMigrations = [
   '008_customer_link_claims.sql',
   '009_function_privilege_hardening.sql',
   '010_table_privilege_hardening.sql',
+  '011_atomic_invites_and_policy_tuning.sql',
 ];
 const requiredFunctions = [
   'create-customer-link-invite',
