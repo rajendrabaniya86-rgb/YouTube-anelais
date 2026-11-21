@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - rebuild/global-trust-network
+  pull_request:
+    branches:
+      - rebuild/global-trust-network
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,6 +19,7 @@ concurrency:
 jobs:
   build-and-preflight:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
