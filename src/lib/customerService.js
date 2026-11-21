@@ -73,3 +73,19 @@ export async function updatePaymentReminder(id,status) {
   .select('id,shop_id,customer_id,due_at,message,status,created_at,completed_at').single();
  if(error) throw error; return data;
 }
+
+
+/**
+ * Read-only shopkeeper view of customer account-link requests.
+ * The Edge Function verifies shop ownership before returning masked details.
+ */
+export async function listPendingCustomerClaims(shopId) {
+ if (!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
+ if (!shopId) throw new Error('दुकान की जानकारी नहीं मिली।');
+ const { data, error } = await supabase.functions.invoke('list-customer-link-claims', {
+  body: { shopId }
+ });
+ if (error) throw error;
+ if (!data || !Array.isArray(data.claims)) throw new Error('अनुरोध सूची का जवाब सही नहीं है।');
+ return data.claims;
+}
