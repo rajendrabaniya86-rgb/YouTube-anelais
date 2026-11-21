@@ -13,4 +13,4 @@
 - Nepal privacy and financial/credit-information laws require qualified local legal review before a public launch.
 
 ## Current prototype warning
-The first UI uses hard-coded sample records and browser state only. It has no real authentication, server, database, access control, or durable storage. Do not enter real customer information.
+The app now has a Supabase authentication flow, shop-scoped database access, RLS migrations, and three server-side customer-link Edge Functions in the dedicated test project. Demo mode still uses hard-coded sample records and browser local storage. The customer-link flow creates a pending claim only; approval, identity verification, consent-based sharing, and customer ledger access are not implemented. Authenticated cross-shop isolation and full end-to-end behavior have not yet been verified. The offline IndexedDB queue is not encrypted. Use synthetic records only; do not enter real customer or financial information.
