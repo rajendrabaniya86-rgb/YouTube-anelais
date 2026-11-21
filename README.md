@@ -8,7 +8,7 @@ This branch contains a working frontend prototype and an in-progress Supabase ba
 
 - Shop-owner signup/login UI (requires Supabase configuration).
 - Demo customer records, credit/payment entries, statements, reports, CSV export, and in-app reminders.
-- Supabase schema and row-level security migrations 001–013 for shop-scoped records.
+- Supabase schema and row-level security migrations 001–014 for shop-scoped records.
 - IndexedDB storage for offline ledger drafts.
 - An idempotent server-side upload helper and database uniqueness migration for safe retry handling.
 
@@ -33,7 +33,7 @@ npm run dev
 
 ## Supabase setup
 
-Follow [docs/SUPABASE-SETUP.md](docs/SUPABASE-SETUP.md). Apply all thirteen SQL migrations in `supabase/migrations/` in numeric order (001–013). Migration 011 adds atomic invitation throttling and trusted audit triggers; migration 012 adds the reminder foreign-key index; migration 013 removes unnecessary elevated rights from the shop-owner helper.
+Follow [docs/SUPABASE-SETUP.md](docs/SUPABASE-SETUP.md). Apply all fourteen SQL migrations in `supabase/migrations/` in numeric order (001–013). Migration 011 adds atomic invitation throttling and trusted audit triggers; migration 012 adds the reminder foreign-key index; migration 013 removes unnecessary elevated rights from the shop-owner helper.
 
 Only use a Supabase publishable/anon key in the browser. Never expose a service-role key.
 
