@@ -11,7 +11,7 @@
 
 ## Sync and database requirements
 - Offline sync uses the stable draft UUID as ledger_entries.client_ref to avoid duplicate entries after an interrupted request.
-- Apply all thirteen migrations, 001 through 013, in numeric order before testing the complete live application. At minimum, offline sync requires 001–004; the current test project has 001–013 applied.
+- Apply all fourteen migrations, 001 through 014, in numeric order before testing the complete live application. At minimum, offline sync requires 001–004; the current test project has 001–014 applied.
 - Migration 004 must be present in the database; committing its SQL file to GitHub does not apply it to Supabase.
 - Sync requires an authenticated account, matching shop/user scope, internet connectivity, and a valid customer record.
 - A failed or conflicting sync leaves the draft in IndexedDB for review. Do not manually delete it to clear an error.
