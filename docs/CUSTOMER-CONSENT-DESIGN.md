@@ -76,14 +76,14 @@ This design must not be treated as implemented. Before any real customer data is
 
 ## Safe account-link invitation foundation (migration 007)
 
-Status: database foundation only. No invitation can be created or redeemed from the app yet.
+Status: limited test implementation. Three JWT-protected Edge Functions create one-time invitations, redeem them into pending claims, and list pending claims for the owning shop. This does not implement approval, identity verification, consent-based sharing, or customer ledger access.
 
 - Migration 007 creates a one-time invitation table bound to one shop and one customer record.
 - Only a SHA-256-sized hash is stored; the raw invitation code must be shown once and never stored.
 - Codes expire and can be redeemed once or revoked.
 - The browser roles `anon` and `authenticated` have no table privileges. Only a trusted server-side function using the service role may access it.
-- The future server function must verify the signed-in shop owner owns the shop before creating an invitation, rate-limit attempts, compare hashes safely, enforce expiry/single-use atomically, and log every attempt.
+- The deployed create function verifies the signed-in shop owner and customer/shop match, applies a basic per-owner rate limit, and stores only a SHA-256 hash. Redemption is atomic and single-use. Rate-limit concurrency and full request logging still need review.
 - Redeeming an invitation only creates a **pending claim**. It must not expose balances or ledger rows. A separate human verification and approval step is required before linking.
 - No customer account is linked and no cross-shop access is granted by this migration.
 
-Apply migration 007 after migration 006. This migration has not been applied to a live Supabase project or tested against a live database. Use synthetic test records only.
+Migrations 007–010 are applied to the dedicated test Supabase project. The three Edge Functions are deployed and active. Static CI passes, but authenticated end-to-end behavior and multi-shop RLS isolation have not yet been proven. Use synthetic test records only.
