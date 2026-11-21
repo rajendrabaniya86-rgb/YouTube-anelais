@@ -72,3 +72,18 @@ No wildcard recipient, public link, public debtor list, or permanent reputation 
 ## Release gate
 
 This design must not be treated as implemented. Before any real customer data is used, the account-linking model, Nepal privacy and financial requirements, RLS, server-side authorization, consent UX, backups, and independent security review must be completed. Until then, use synthetic test data only.
+
+
+## Safe account-link invitation foundation (migration 007)
+
+Status: database foundation only. No invitation can be created or redeemed from the app yet.
+
+- Migration 007 creates a one-time invitation table bound to one shop and one customer record.
+- Only a SHA-256-sized hash is stored; the raw invitation code must be shown once and never stored.
+- Codes expire and can be redeemed once or revoked.
+- The browser roles `anon` and `authenticated` have no table privileges. Only a trusted server-side function using the service role may access it.
+- The future server function must verify the signed-in shop owner owns the shop before creating an invitation, rate-limit attempts, compare hashes safely, enforce expiry/single-use atomically, and log every attempt.
+- Redeeming an invitation only creates a **pending claim**. It must not expose balances or ledger rows. A separate human verification and approval step is required before linking.
+- No customer account is linked and no cross-shop access is granted by this migration.
+
+Apply migration 007 after migration 006. This migration has not been applied to a live Supabase project or tested against a live database. Use synthetic test records only.
