@@ -16,6 +16,7 @@ const requiredMigrations = [
   '012_payment_reminder_fk_index.sql',
   '013_invoker_shop_owner_helper.sql',
   '014_customer_consent_write_lockdown.sql',
+  '015_same_customer_ledger_references.sql',
 ];
 const requiredFunctions = [
   'create-customer-link-invite',
