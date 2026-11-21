@@ -8,9 +8,10 @@ This branch contains a working frontend prototype and an in-progress Supabase ba
 
 - Shop-owner signup/login UI (requires Supabase configuration).
 - Demo customer records, credit/payment entries, statements, reports, CSV export, and in-app reminders.
-- Supabase schema and row-level security migrations 001–014 for shop-scoped records.
+- Supabase schema and row-level security migrations 001–016 for shop-scoped records.
 - IndexedDB storage for offline ledger drafts.
 - An idempotent server-side upload helper and database uniqueness migration for safe retry handling.
+- Shop-owner approval/rejection of pending customer-link claims, enforced by a database function that checks the owning shop and writes to the audit trail. Approval does not grant ledger access.
 
 ## Important limitations
 
@@ -20,7 +21,7 @@ This is **not production-ready** and must use fake test data only until reviewed
 - SQL migrations must be applied manually in order and tested against two separate test shop accounts.
 - Offline drafts can be saved locally, reviewed in the pending-drafts screen, and synced manually when online. The queue is not encrypted, and live sync still requires migration 004 plus a configured Supabase project.
 - Browser IndexedDB data is not encrypted by this app.
-- Customer self-service approval, verified consent, cross-shop sharing, dispute workflow, automated notifications, and AI summaries are not implemented as production features. Invitation redemption currently creates only a pending claim.
+- Customer self-service confirmation, verified identity, consent-based sharing, dispute workflow, automated notifications, and AI summaries are not implemented as production features. Invitation redemption currently creates only a pending claim.
 - No authenticated multi-shop RLS test, real-device offline test, complete live Supabase end-to-end test, penetration test, or end-to-end acceptance test has been completed.
 - A successful hosting build does not prove database or security behavior.
 
@@ -33,7 +34,7 @@ npm run dev
 
 ## Supabase setup
 
-Follow [docs/SUPABASE-SETUP.md](docs/SUPABASE-SETUP.md). Apply all fourteen SQL migrations in `supabase/migrations/` in numeric order (001–013). Migration 011 adds atomic invitation throttling and trusted audit triggers; migration 012 adds the reminder foreign-key index; migration 013 removes unnecessary elevated rights from the shop-owner helper.
+Follow [docs/SUPABASE-SETUP.md](docs/SUPABASE-SETUP.md). Apply all sixteen SQL migrations in `supabase/migrations/` in numeric order (001–016). Migration 011 adds atomic invitation throttling and trusted audit triggers; migration 012 adds the reminder foreign-key index; migration 013 removes unnecessary elevated rights from the shop-owner helper.
 
 Only use a Supabase publishable/anon key in the browser. Never expose a service-role key.
 
