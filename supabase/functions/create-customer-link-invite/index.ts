@@ -71,30 +71,25 @@ Deno.serve(async (request: Request) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Basic per-owner creation throttle. The database still stores only hashes.
-    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count, error: countError } = await admin
-      .from("customer_link_invites")
-      .select("id", { count: "exact", head: true })
-      .eq("created_by", user.id)
-      .gte("created_at", since);
-    if (countError) return respond(500, { error: "निमंत्रण सीमा जाँची नहीं जा सकी।" });
-    if ((count ?? 0) >= 10) return respond(429, { error: "एक घंटे में अधिकतम 10 निमंत्रण बनाए जा सकते हैं।" });
-
     const random = new Uint8Array(32);
     crypto.getRandomValues(random);
     const inviteCode = encodeBase64Url(random);
     const tokenHash = await sha256(inviteCode);
     const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 
-    const { error: insertError } = await admin.from("customer_link_invites").insert({
-      shop_id: shopId,
-      customer_id: customerId,
-      token_hash: tokenHash,
-      created_by: user.id,
-      expires_at: expiresAt,
+    const { error: insertError } = await admin.rpc("create_customer_link_invite_atomic", {
+      p_shop_id: shopId,
+      p_customer_id: customerId,
+      p_created_by: user.id,
+      p_token_hash: tokenHash,
+      p_expires_at: expiresAt,
     });
-    if (insertError) return respond(500, { error: "निमंत्रण सुरक्षित रूप से सेव नहीं हो सका।" });
+    if (insertError) {
+      if (insertError.message?.includes("INVITE_RATE_LIMIT")) {
+        return respond(429, { error: "एक घंटे में अधिकतम 10 निमंत्रण बनाए जा सकते हैं।" });
+      }
+      return respond(500, { error: "निमंत्रण सुरक्षित रूप से सेव नहीं हो सका।" });
+    }
 
     // Show the raw code once. It is never written to the database or logs.
     return respond(200, {
