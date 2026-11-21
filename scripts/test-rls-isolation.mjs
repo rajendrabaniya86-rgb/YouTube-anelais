@@ -150,7 +150,7 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   const expiredRow = await must(admin.from('customer_link_invites').select('id')
     .eq('created_by', ownerA.id).eq('token_hash', `\\x${expiredDigest}`).single(),
     'find synthetic expiry-test invite');
-  await must(admin.from('customer_link_invites').update({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+  await must(admin.from('customer_link_invites').update({ created_at: new Date(Date.now() - 120_000).toISOString(), expires_at: new Date(Date.now() - 60_000).toISOString() })
     .eq('id', expiredRow.id).select('id').single(), 'expire synthetic invite');
   const expiredRedeem = await clientCustomer.functions.invoke('redeem-customer-link-invite', {
     body: { inviteCode: expiredInvite.data.inviteCode },
