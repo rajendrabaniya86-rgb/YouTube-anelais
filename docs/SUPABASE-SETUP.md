@@ -7,8 +7,8 @@ Use a separate test Supabase project and synthetic records only.
 3. Copy the project reference from Project Settings → General. Link this repository with `supabase link --project-ref YOUR_PROJECT_REF`.
 4. In Project Settings → API, copy the Project URL and publishable/anon key. Locally copy `.env.example` to `.env.local` and fill in only those two browser-safe values.
 5. Run `npm install`, `npm run check:supabase`, and `npm run build` before deploying.
-6. Preview the pending database changes with `supabase db push --dry-run`. If the target is the new empty test project and the migration list is correct, apply with `supabase db push`. This applies the eight SQL migrations in filename order; do not paste or deploy them as Edge Functions.
-7. Confirm the remote migration history contains all eight migrations with `supabase migration list`.
+6. Preview the pending database changes with `supabase db push --dry-run`. If the target is the new empty test project and the migration list is correct, apply with `supabase db push`. This applies the ten SQL migrations in filename order; do not paste or deploy them as Edge Functions.
+7. Confirm the remote migration history contains all ten migrations with `supabase migration list`.
 8. Deploy the three Edge Functions only after the database migrations succeed:
    - `supabase functions deploy create-customer-link-invite`
    - `supabase functions deploy redeem-customer-link-invite`
@@ -68,7 +68,7 @@ npm run check:supabase
 npm run build
 ```
 
-The preflight checks that all eight expected migration files are present, that no unexpected SQL migration is silently added to this reviewed deployment set, that all three Edge Functions exist with JWT verification enabled, and that service-role credential names do not appear in browser source or the browser environment example. GitHub Actions runs this preflight before the production build.
+The preflight checks that all ten expected migration files are present, that no unexpected SQL migration is silently added to this reviewed deployment set, that all three Edge Functions exist with JWT verification enabled, and that service-role credential names do not appear in browser source or the browser environment example. GitHub Actions runs this preflight before the production build.
 
 After linking a dedicated test project, use:
 
@@ -83,7 +83,7 @@ supabase functions deploy list-customer-link-claims
 supabase functions list
 ```
 
-Do not use `--include-all` to force migrations into a project with unknown history. Stop if the remote migration history differs from the expected eight files and review it first. Do not run these commands against a production database during initial testing.
+Do not use `--include-all` to force migrations into a project with unknown history. Stop if the remote migration history differs from the expected ten files and review it first. Do not run these commands against a production database during initial testing.
 
 ### Live acceptance checklist
 
