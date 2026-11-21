@@ -18,10 +18,10 @@ This is **not production-ready** and must use fake test data only until reviewed
 
 - Supabase project credentials have not been configured in this repository.
 - SQL migrations must be applied manually in order and tested against two separate test shop accounts.
-- Offline drafts can be saved locally, but the app's pending-draft review and user-triggered sync screen are not yet complete.
+- Offline drafts can be saved locally, reviewed in the pending-drafts screen, and synced manually when online. The queue is not encrypted, and live sync still requires migration 004 plus a configured Supabase project.
 - Browser IndexedDB data is not encrypted by this app.
 - Customer self-service, verified consent, cross-shop sharing, dispute workflow, notifications, and AI summaries are not implemented as production features.
-- No real device, database integration, penetration, or end-to-end acceptance test has been completed.
+- No real-device offline test, live Supabase integration test, penetration test, or end-to-end acceptance test has been completed.
 - A successful hosting build does not prove database or security behavior.
 
 ## Run locally
