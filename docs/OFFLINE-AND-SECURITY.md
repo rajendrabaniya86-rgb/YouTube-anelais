@@ -11,7 +11,7 @@
 
 ## Sync and database requirements
 - Offline sync uses the stable draft UUID as ledger_entries.client_ref to avoid duplicate entries after an interrupted request.
-- Apply all ten migrations, 001 through 010, in numeric order before testing the complete live application. At minimum, offline sync requires 001–004; the current test project has 001–010 applied.
+- Apply all twelve migrations, 001 through 012, in numeric order before testing the complete live application. At minimum, offline sync requires 001–004; the current test project has 001–012 applied.
 - Migration 004 must be present in the database; committing its SQL file to GitHub does not apply it to Supabase.
 - Sync requires an authenticated account, matching shop/user scope, internet connectivity, and a valid customer record.
 - A failed or conflicting sync leaves the draft in IndexedDB for review. Do not manually delete it to clear an error.
@@ -19,13 +19,13 @@
 ## Security controls
 - Supabase Row Level Security is intended to isolate shop data.
 - Migration 002 adds explicit shop-scoped rules and checks that ledger/consent rows reference a customer from the same shop.
-- Ledger and audit history are append-only at the database trigger level. Corrections should be new reversal/correction entries.
+- Ledger and audit history are append-only at the database trigger level. Migration 011 also writes audit events for shop, customer, ledger, consent, reminder, invitation, and claim changes; dispute events are not available because that workflow is not implemented. Corrections should be new reversal/correction entries.
 - Vercel response headers add MIME sniffing, framing, referrer, permissions, and opener protections.
 - The frontend must use only the Supabase anon/publishable key. Never put a service-role key in browser code or commit secrets.
 
 ## Required verification
 1. Use a separate test Supabase project and synthetic data only.
-2. Apply migrations 001 through 010 in order for the current full test build; migrations 001–004 are the minimum database foundation for offline sync alone.
+2. Apply migrations 001 through 012 in order for the current full test build; migrations 001–004 are the minimum database foundation for offline sync alone.
 3. Test offline draft creation, reconnect, Sync Now, Sync All, retry after a simulated interrupted response, and a mismatched user/shop scope.
 4. Verify a failed sync keeps the draft and a confirmed sync removes it exactly once.
 5. Test two separate shop-owner accounts and verify neither can read or write the other's records.
