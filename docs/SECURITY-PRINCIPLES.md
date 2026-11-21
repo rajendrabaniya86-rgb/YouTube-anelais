@@ -5,7 +5,7 @@
 - Cross-shop disclosure must be purpose-specific, time-bounded, revocable where legally possible, and backed by recorded customer consent.
 - Collect the minimum personal data needed. Mask phone numbers in general views.
 - Never store raw fingerprint, face, or other biometric templates in this app.
-- The `audit_events` table and append-only database protections exist, but automatic audit-event creation for every ledger, consent, invitation, and dispute action is not implemented. Do not describe the current prototype as having a complete tamper-evident audit trail.
+- Migration 011 adds server-side audit triggers for shop, customer, ledger, consent, reminder, invitation, and claim writes. Browser roles cannot insert audit rows directly, and audit rows are append-only. Dispute events are not implemented because a dispute workflow does not yet exist. This is an audit log foundation, not a certified tamper-evident system.
 - Do not silently delete settled transactions. Use reversal/correction entries with reasons.
 - Encrypt traffic; protect secrets in server-side environment variables, never in frontend code or Git.
 - Provide export and account deletion workflows consistent with legal retention obligations.
