@@ -10,6 +10,8 @@ Use a separate test Supabase project and synthetic records only.
    - supabase/migrations/002_security_hardening.sql
    - supabase/migrations/003_payment_reminders.sql
    - supabase/migrations/004_ledger_offline_idempotency.sql
+   - supabase/migrations/005_customer_account_foundation.sql
+   - supabase/migrations/006_protect_account_type.sql
 5. In Authentication → URL Configuration, set the local and deployed redirect URLs.
 6. In Authentication → Providers, enable Email. Configure email confirmation before public use.
 7. Run npm install and npm run dev.
@@ -30,6 +32,6 @@ Use a separate test Supabase project and synthetic records only.
 
 ## Customer account foundation (migration 005)
 
-Migration 005 adds a `profiles.account_type` label and lets signup create a customer account without creating a shop. The label is for interface routing only. It is not proof of identity and must never be used as authorization. Existing shop-owner RLS remains the data boundary.
+Migration 005 adds a `profiles.account_type` label and lets signup create a customer account without creating a shop. Migration 006 prevents an authenticated user from changing that database field through normal profile updates. The label is for interface routing only. It is not proof of identity and must never be used as authorization. Existing shop-owner RLS remains the data boundary.
 
 Customer accounts currently see a clear placeholder screen. They cannot link customer records, read shop ledgers, grant sharing permissions, or view another shop's data. Those features require a separately verified account-linking and customer-controlled consent implementation. Apply migration 005 after migration 004 before testing customer signup. Test with synthetic accounts only.
