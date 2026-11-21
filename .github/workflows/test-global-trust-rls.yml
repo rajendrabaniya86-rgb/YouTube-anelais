@@ -1,5 +1,8 @@
 name: Global Trust Network RLS Security Test
 on:
+  push:
+    branches:
+      - rebuild/global-trust-network
   workflow_dispatch:
 permissions:
   contents: read
