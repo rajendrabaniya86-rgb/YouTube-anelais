@@ -230,6 +230,24 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   assert(Boolean(invalidRedeem.error),
     'Malformed invite codes are rejected');
 
+  // Composite foreign keys must prevent cross-customer references even
+  // if an application request accidentally supplies another tenant's IDs.
+  const crossTenantCorrection = await clientA.from('ledger_entries').insert({
+    shop_id: shopA, customer_id: customerA.id, entry_type: 'credit', amount: 3,
+    note: 'AUTOMATED TEST FIXTURE ONLY', created_by: ownerA.id,
+    corrects_entry_id: ledgerB.id,
+  });
+  assert(Boolean(crossTenantCorrection.error),
+    'Ledger correction cannot reference another shop/customer ledger entry');
+
+  const crossTenantReminder = await clientA.from('payment_reminders').insert({
+    shop_id: shopA, customer_id: customerA.id, ledger_entry_id: ledgerB.id,
+    due_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    message: 'AUTOMATED TEST FIXTURE ONLY', created_by: ownerA.id,
+  });
+  assert(Boolean(crossTenantReminder.error),
+    'Payment reminder cannot reference another shop/customer ledger entry');
+
   const consentAttempt = await clientA.from('customer_consents').insert({
     shop_id: shopA, customer_id: customerA.id, purpose: 'automated-test-only',
     evidence_note: 'Synthetic test must be rejected', recorded_by: ownerA.id,
