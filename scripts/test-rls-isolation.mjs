@@ -112,15 +112,13 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   assert(Boolean(repeatRedeem.error),
     'A redeemed invite cannot be reused');
 
-  const claimCount = await must(
-    admin.from('customer_link_claims')
-      .select('id', { count: 'exact', head: true })
-      .eq('customer_id', customerA.id)
-      .eq('customer_user_id', customer.id)
-      .eq('status', 'pending'),
-    'count synthetic pending claims',
-  );
-  assert(claimCount.count === 1,
+  const claimCountResult = await admin.from('customer_link_claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('customer_id', customerA.id)
+    .eq('customer_user_id', customer.id)
+    .eq('status', 'pending');
+  if (claimCountResult.error) throw new Error(`count synthetic pending claims: ${claimCountResult.error.message}`);
+  assert(claimCountResult.count === 1,
     'Repeated redemption creates only one pending claim');
 
   const ownerClaims = await clientA.functions.invoke('list-customer-link-claims', {
