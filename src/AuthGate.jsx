@@ -12,6 +12,7 @@ export default function AuthGate({ children }) {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [demo, setDemo] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -32,20 +33,35 @@ export default function AuthGate({ children }) {
 
   async function submit(e) {
     e.preventDefault();
+    if (submitting) return;
     setMessage('');
     if (!supabase || !hasSupabaseConfig) return setMessage('Supabase कनेक्ट नहीं है। अभी डेमो मोड इस्तेमाल करें।');
     if (password.length < 8) return setMessage('पासवर्ड कम से कम 8 अक्षर का रखें।');
-    if (mode === 'signup') {
-      if (!name.trim() || !shop.trim()) return setMessage('अपना नाम और दुकान का नाम भरें।');
-      const { error } = await supabase.auth.signUp({
-        email, password,
-        options: { data: { full_name: name.trim(), shop_name: shop.trim() } }
-      });
-      if (error) setMessage(error.message);
-      else setMessage('रजिस्ट्रेशन अनुरोध भेज दिया गया। ईमेल में पुष्टि लिंक देखें।');
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setMessage(error.message);
+    if (mode === 'signup' && (!name.trim() || !shop.trim())) {
+      return setMessage('अपना नाम और दुकान का नाम भरें।');
+    }
+
+    setSubmitting(true);
+    try {
+      if (mode === 'signup') {
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { data: { full_name: name.trim(), shop_name: shop.trim() } }
+        });
+        if (error) throw error;
+        setMessage('रजिस्ट्रेशन अनुरोध भेज दिया गया। ईमेल में पुष्टि लिंक देखें।');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password
+        });
+        if (error) throw error;
+      }
+    } catch (error) {
+      setMessage(error?.message || 'लॉगिन सेवा से संपर्क नहीं हो पाया। इंटरनेट जाँचकर फिर कोशिश करें।');
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -67,7 +83,7 @@ export default function AuthGate({ children }) {
         <label>ईमेल</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required/>
         <label>पासवर्ड</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="कम से कम 8 अक्षर" minLength="8" required/>
         {message && <div className="auth-message" role="status">{message}</div>}
-        <button className="primary-btn auth-submit" type="submit">{mode === 'login' ? 'लॉगिन करें' : 'खाता बनाएँ'} <ArrowRight size={17}/></button>
+        <button className="primary-btn auth-submit" type="submit" disabled={submitting}>{submitting ? 'कृपया प्रतीक्षा करें…' : mode === 'login' ? 'लॉगिन करें' : 'खाता बनाएँ'} <ArrowRight size={17}/></button>
       </form>
       <button className="auth-switch" onClick={() => {setMode(mode === 'login' ? 'signup' : 'login');setMessage('');}}>{mode === 'login' ? 'नया खाता बनाना है? रजिस्टर करें' : 'पहले से खाता है? लॉगिन करें'}</button>
       <div className="auth-foot"><ShieldCheck size={15}/> सुरक्षित कनेक्शन • निजी दुकान डेटा</div>
