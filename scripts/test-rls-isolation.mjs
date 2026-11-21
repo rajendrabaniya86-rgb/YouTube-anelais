@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 const url = process.env.SUPABASE_URL;
 const secretKey = process.env.SUPABASE_SECRET_KEY;
@@ -139,6 +139,39 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   });
   assert(Boolean(customerListClaims.error),
     'Customer account cannot list shop-owner pending claims');
+
+  // Expired and revoked invite codes must fail through the public Edge Function.
+  const expiredInvite = await clientA.functions.invoke('create-customer-link-invite', {
+    body: { shopId: shopA, customerId: customerA.id, expiresInHours: 1 },
+  });
+  assert(!expiredInvite.error && typeof expiredInvite.data?.inviteCode === 'string',
+    'Shop owner can create an invite for expiry testing');
+  const expiredDigest = createHash('sha256').update(expiredInvite.data.inviteCode).digest('hex');
+  const expiredRow = await must(admin.from('customer_link_invites').select('id')
+    .eq('created_by', ownerA.id).eq('token_hash', `\\\\x${expiredDigest}`).single(),
+    'find synthetic expiry-test invite');
+  await must(admin.from('customer_link_invites').update({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+    .eq('id', expiredRow.id).select('id').single(), 'expire synthetic invite');
+  const expiredRedeem = await clientCustomer.functions.invoke('redeem-customer-link-invite', {
+    body: { inviteCode: expiredInvite.data.inviteCode },
+  });
+  assert(Boolean(expiredRedeem.error), 'Expired invite codes are rejected');
+
+  const revokedInvite = await clientA.functions.invoke('create-customer-link-invite', {
+    body: { shopId: shopA, customerId: customerA.id, expiresInHours: 1 },
+  });
+  assert(!revokedInvite.error && typeof revokedInvite.data?.inviteCode === 'string',
+    'Shop owner can create an invite for revocation testing');
+  const revokedDigest = createHash('sha256').update(revokedInvite.data.inviteCode).digest('hex');
+  const revokedRow = await must(admin.from('customer_link_invites').select('id')
+    .eq('created_by', ownerA.id).eq('token_hash', `\\\\x${revokedDigest}`).single(),
+    'find synthetic revocation-test invite');
+  await must(admin.from('customer_link_invites').update({ revoked_at: new Date().toISOString() })
+    .eq('id', revokedRow.id).select('id').single(), 'revoke synthetic invite');
+  const revokedRedeem = await clientCustomer.functions.invoke('redeem-customer-link-invite', {
+    body: { inviteCode: revokedInvite.data.inviteCode },
+  });
+  assert(Boolean(revokedRedeem.error), 'Revoked invite codes are rejected');
 
   const invalidRedeem = await clientCustomer.functions.invoke('redeem-customer-link-invite', {
     body: { inviteCode: 'not-a-valid-invite' },
