@@ -13,6 +13,7 @@ export default function AuthGate({ children }) {
   const [message, setMessage] = useState('');
   const [demo, setDemo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [accountType, setAccountType] = useState('shop_owner');
 
   useEffect(() => {
     if (!supabase) return;
@@ -37,7 +38,7 @@ export default function AuthGate({ children }) {
     setMessage('');
     if (!supabase || !hasSupabaseConfig) return setMessage('Supabase कनेक्ट नहीं है। अभी डेमो मोड इस्तेमाल करें।');
     if (password.length < 8) return setMessage('पासवर्ड कम से कम 8 अक्षर का रखें।');
-    if (mode === 'signup' && (!name.trim() || !shop.trim())) {
+    if (mode === 'signup' && (!name.trim() || (accountType === 'shop_owner' && !shop.trim()))) {
       return setMessage('अपना नाम और दुकान का नाम भरें।');
     }
 
@@ -47,7 +48,7 @@ export default function AuthGate({ children }) {
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { full_name: name.trim(), shop_name: shop.trim() } }
+          options: { data: { full_name: name.trim(), account_type: accountType, ...(accountType === 'shop_owner' ? { shop_name: shop.trim() } : {}) } }
         });
         if (error) throw error;
         setMessage('रजिस्ट्रेशन अनुरोध भेज दिया गया। ईमेल में पुष्टि लिंक देखें।');
@@ -66,19 +67,20 @@ export default function AuthGate({ children }) {
   }
 
   if (loading) return <div className="auth-loading">सुरक्षित लॉगिन जाँचा जा रहा है…</div>;
+  if (session && session.user?.user_metadata?.account_type === 'customer') return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><span><ShieldCheck size={27}/></span><div><b>GLOBAL TRUST</b><small>NETWORK</small></div></div><div className="auth-kicker"><ShieldCheck size={14}/> ग्राहक पोर्टल</div><h1>आपका ग्राहक खाता बन गया है</h1><p className="auth-desc">अभी ग्राहक रिकॉर्ड जोड़ने या दूसरी दुकानों का हिसाब देखने की सुविधा चालू नहीं है। आपकी अनुमति और पहचान सत्यापन की व्यवस्था बनने तक कोई दुकान का डेटा साझा नहीं होगा।</p><div className="auth-message" role="status">आपका खाता सुरक्षित है। अभी कोई दुकान रिकॉर्ड इससे लिंक नहीं है।</div><button className="primary-btn auth-submit" onClick={() => supabase.auth.signOut()}>लॉग आउट</button></section></main>;
   if (session) return <>{React.cloneElement(children, { mode: 'live', user: session.user })}<button className="signout-fab" onClick={() => supabase.auth.signOut()}>लॉग आउट</button></>;
   if (demo) return <>{React.cloneElement(children, { mode: 'demo', user: null })}<div className="demo-banner">डेमो मोड: नमूना डेटा ही दिखाया जा रहा है। <button onClick={() => setDemo(false)}>लॉगिन पर लौटें</button></div></>;
 
   return <main className="auth-screen">
     <section className="auth-card">
       <div className="auth-brand"><span><ShieldCheck size={27}/></span><div><b>GLOBAL TRUST</b><small>NETWORK</small></div></div>
-      <div className="auth-kicker"><Store size={14}/> दुकानदार पोर्टल</div>
-      <h1>{mode === 'login' ? 'अपने खाते में प्रवेश करें' : 'अपनी दुकान का खाता बनाएँ'}</h1>
+      <div className="auth-kicker"><Store size={14}/> {accountType === 'customer' ? 'ग्राहक पोर्टल' : 'दुकानदार पोर्टल'}</div>
+      <h1>{mode === 'login' ? 'अपने खाते में प्रवेश करें' : accountType === 'customer' ? 'ग्राहक खाता बनाएँ' : 'अपनी दुकान का खाता बनाएँ'}</h1>
       <p className="auth-desc">उधार और जमा का हिसाब सुरक्षित और साफ तरीके से संभालें।</p>
       <form onSubmit={submit}>
         {mode === 'signup' && <>
           <label>आपका नाम</label><input value={name} onChange={e => setName(e.target.value)} placeholder="पूरा नाम" required/>
-          <label>दुकान का नाम</label><input value={shop} onChange={e => setShop(e.target.value)} placeholder="दुकान का नाम" required/>
+          {accountType === 'shop_owner' && <><label>दुकान का नाम</label><input value={shop} onChange={e => setShop(e.target.value)} placeholder="दुकान का नाम" required/></>}
         </>}
         <label>ईमेल</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required/>
         <label>पासवर्ड</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="कम से कम 8 अक्षर" minLength="8" required/>
