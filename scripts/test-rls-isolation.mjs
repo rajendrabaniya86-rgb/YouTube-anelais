@@ -45,17 +45,7 @@ async function visibleIds(client, table, id) {
   const data = await must(client.from(table).select('id').eq('id', id), `read ${table}`);
   return data.map(row => row.id);
 }
-async function cleanup() {
-  // Delete only records created by this run, in FK-safe order.
-  if (fixture.auditIds.length) await admin.from('audit_events').delete().in('id', fixture.auditIds);
-  if (fixture.ledgerIds.length) await admin.from('ledger_entries').delete().in('id', fixture.ledgerIds);
-  if (fixture.customerIds.length) await admin.from('customers').delete().in('id', fixture.customerIds);
-  if (fixture.shopIds.length) await admin.from('shops').delete().in('id', fixture.shopIds);
-  for (const id of createdUsers.reverse()) await admin.auth.admin.deleteUser(id);
-}
-
-try {
-  const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`);
+const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`);
   const ownerB = await createUser('shop_owner', `Synthetic Shop B ${tag}`);
   const customer = await createUser('customer');
 
@@ -96,7 +86,4 @@ try {
   });
   assert(Boolean(consentAttempt.error), 'Shop owner cannot write customer consent directly');
 
-  console.log(`RESULT: ${passed} security checks passed.`);
-} finally {
-  await cleanup();
-}
+console.log(`RESULT: ${passed} security checks passed. Synthetic test accounts and records are retained in the isolated test project for review.`);
