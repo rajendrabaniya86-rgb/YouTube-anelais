@@ -7,17 +7,12 @@ Use a separate test Supabase project and synthetic records only.
 3. Copy the project reference from Project Settings → General. Link this repository with `supabase link --project-ref YOUR_PROJECT_REF`.
 4. In Project Settings → API, copy the Project URL and publishable/anon key. Locally copy `.env.example` to `.env.local` and fill in only those two browser-safe values.
 5. Run `npm install`, `npm run check:supabase`, and `npm run build` before deploying.
-6. Preview the pending database changes with `supabase db push --dry-run`. If the target is the new empty test project and the migration list is correct, apply with `supabase db push`.
-7. Confirm the remote migration history contains all eight migrations before deploying functions.
-8. Deploy the Edge Functions in this order:
-   - supabase/migrations/001_initial_schema.sql
-   - supabase/migrations/002_security_hardening.sql
-   - supabase/migrations/003_payment_reminders.sql
-   - supabase/migrations/004_ledger_offline_idempotency.sql
-   - supabase/migrations/005_customer_account_foundation.sql
-   - supabase/migrations/006_protect_account_type.sql
-   - supabase/migrations/007_customer_link_invites.sql
-   - supabase/migrations/008_customer_link_claims.sql
+6. Preview the pending database changes with `supabase db push --dry-run`. If the target is the new empty test project and the migration list is correct, apply with `supabase db push`. This applies the eight SQL migrations in filename order; do not paste or deploy them as Edge Functions.
+7. Confirm the remote migration history contains all eight migrations with `supabase migration list`.
+8. Deploy the three Edge Functions only after the database migrations succeed:
+   - `supabase functions deploy create-customer-link-invite`
+   - `supabase functions deploy redeem-customer-link-invite`
+   - `supabase functions deploy list-customer-link-claims`
 9. In Authentication → URL Configuration, set the exact local and deployed redirect URLs.
 10. In Authentication → Providers, enable Email and keep email confirmation enabled for testing.
 11. Run `npm run dev` locally and test with two separate synthetic shop-owner accounts plus one customer account.
@@ -26,7 +21,7 @@ Use a separate test Supabase project and synthetic records only.
 
 - Use only the publishable/anon key in the browser. Never expose the service_role key.
 - The initial schema creates one shop for each new signup using the shop name in signup metadata.
-- The current database model supports shop-owner access only. Customer self-service accounts, verified consent, cross-shop sharing, and support review are not implemented.
+- Shop-owner access to shop records is protected by RLS. Customer accounts and pending invitation claims are implemented as a limited foundation, but claim approval/rejection, verified identity, customer-controlled ledger consent, cross-shop sharing, and support review are not implemented.
 - The offline draft review screen supports per-draft and batch sync, but live sync requires all four migrations, valid Supabase configuration, and a real authenticated test session.
 - Migration files committed to GitHub are not automatically applied to Supabase. Confirm the SQL editor reports success for every migration.
 - Test Row Level Security with at least two separate test shop-owner accounts and verify neither account can read or write the other's records.
@@ -39,7 +34,7 @@ Use a separate test Supabase project and synthetic records only.
 
 Migration 005 adds a `profiles.account_type` label and lets signup create a customer account without creating a shop. Migration 006 prevents an authenticated user from changing that database field through normal profile updates. The label is for interface routing only. It is not proof of identity and must never be used as authorization. Existing shop-owner RLS remains the data boundary.
 
-Customer accounts currently see a clear placeholder screen. They cannot link customer records, read shop ledgers, grant sharing permissions, or view another shop's data. Those features require a separately verified account-linking and customer-controlled consent implementation. Apply migration 005 after migration 004 before testing customer signup. Test with synthetic accounts only.
+Customer accounts can redeem an invitation and submit a pending claim after migrations 005–008 and the related Edge Functions are deployed. A pending claim does not link the account, grant sharing permission, or allow the customer to read shop ledgers or another shop's data. Claim approval/rejection and customer-controlled ledger consent are not implemented. Apply migration 005 after migration 004 before testing customer signup. Test with synthetic accounts only.
 
 ## Customer link invitation function (migration 007)
 
