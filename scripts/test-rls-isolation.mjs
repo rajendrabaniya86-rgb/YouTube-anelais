@@ -236,4 +236,25 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   });
   assert(Boolean(consentAttempt.error), 'Shop owner cannot write customer consent directly');
 
+// Atomic invite rate-limit boundary: the RPC already enforces 10 invites
+// per owner per rolling hour under an advisory transaction lock.
+const inviteCountBeforeRateTest = await admin.from('customer_link_invites')
+  .select('id', { count: 'exact', head: true })
+  .eq('created_by', ownerA.id)
+  .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString());
+if (inviteCountBeforeRateTest.error) throw new Error(`count rate-limit fixtures: ${inviteCountBeforeRateTest.error.message}`);
+if (inviteCountBeforeRateTest.count > 10) throw new Error('Unexpected invite fixture count exceeds configured rate limit.');
+for (let i = inviteCountBeforeRateTest.count; i < 10; i += 1) {
+  const fillInvite = await clientA.functions.invoke('create-customer-link-invite', {
+    body: { shopId: shopA, customerId: customerA.id, expiresInHours: 1 },
+  });
+  if (fillInvite.error || typeof fillInvite.data?.inviteCode !== 'string') {
+    throw new Error(`Could not fill synthetic invite quota at slot ${i + 1}: ${fillInvite.error?.message ?? 'missing invite code'}`);
+  }
+}
+const rateLimitedInvite = await clientA.functions.invoke('create-customer-link-invite', {
+  body: { shopId: shopA, customerId: customerA.id, expiresInHours: 1 },
+});
+assert(Boolean(rateLimitedInvite.error), '11th invite within one hour is rate-limited for the same shop owner');
+
 console.log(`RESULT: ${passed} security checks passed. Synthetic test accounts and records are retained in the isolated test project for review.`);
