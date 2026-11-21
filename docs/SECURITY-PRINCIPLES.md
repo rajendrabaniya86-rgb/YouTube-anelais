@@ -5,7 +5,7 @@
 - Cross-shop disclosure must be purpose-specific, time-bounded, revocable where legally possible, and backed by recorded customer consent.
 - Collect the minimum personal data needed. Mask phone numbers in general views.
 - Never store raw fingerprint, face, or other biometric templates in this app.
-- Migration 011 adds server-side audit triggers for shop, customer, ledger, consent, reminder, invitation, and claim writes. Browser roles cannot insert audit rows directly, and audit rows are append-only. Dispute events are not implemented because a dispute workflow does not yet exist. This is an audit log foundation, not a certified tamper-evident system.
+- Migration 011 adds server-side audit triggers for shop, customer, ledger, consent, reminder, invitation, and claim writes. Browser roles cannot insert audit rows directly, and audit rows are append-only. Dispute events are not implemented because a dispute workflow does not yet exist. Migration 013 makes the shop ownership helper SECURITY INVOKER and avoids unnecessary elevated rights. This is an audit log foundation, not a certified tamper-evident system.
 - Do not silently delete settled transactions. Use reversal/correction entries with reasons.
 - Encrypt traffic; protect secrets in server-side environment variables, never in frontend code or Git.
 - Provide export and account deletion workflows consistent with legal retention obligations.
