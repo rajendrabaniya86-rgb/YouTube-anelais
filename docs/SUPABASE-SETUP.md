@@ -7,8 +7,8 @@ Use a separate test Supabase project and synthetic records only.
 3. Copy the project reference from Project Settings → General. Link this repository with `supabase link --project-ref YOUR_PROJECT_REF`.
 4. In Project Settings → API, copy the Project URL and publishable/anon key. Locally copy `.env.example` to `.env.local` and fill in only those two browser-safe values.
 5. Run `npm install`, `npm run check:supabase`, and `npm run build` before deploying.
-6. Preview the pending database changes with `supabase db push --dry-run`. If the target is the new empty test project and the migration list is correct, apply with `supabase db push`. This applies the fourteen SQL migrations in filename order; do not paste or deploy them as Edge Functions.
-7. Confirm the remote migration history contains all fourteen migrations with `supabase migration list`.
+6. Preview the pending database changes with `supabase db push --dry-run`. If the target is the new empty test project and the migration list is correct, apply with `supabase db push`. This applies the sixteen SQL migrations in filename order; do not paste or deploy them as Edge Functions.
+7. Confirm the remote migration history contains all sixteen migrations with `supabase migration list`.
 8. Deploy the three Edge Functions only after the database migrations succeed:
    - `supabase functions deploy create-customer-link-invite`
    - `supabase functions deploy redeem-customer-link-invite`
@@ -21,13 +21,13 @@ Use a separate test Supabase project and synthetic records only.
 
 - Use only the publishable/anon key in the browser. Never expose the service_role key.
 - The initial schema creates one shop for each new signup using the shop name in signup metadata.
-- Shop-owner access to shop records is protected by RLS. Customer accounts and pending invitation claims are implemented as a limited foundation, but claim approval/rejection, verified identity, customer-controlled ledger consent, cross-shop sharing, and support review are not implemented.
+- Shop-owner access to shop records is protected by RLS. Customer accounts and pending invitation claims are implemented as a limited foundation, but claim shop-owner approval/rejection is implemented in migration 016, but verified identity, customer confirmation, customer-controlled ledger consent, cross-shop sharing, and support review are not implemented.
 - The offline draft review screen supports per-draft and batch sync, but live sync requires all four migrations, valid Supabase configuration, and a real authenticated test session.
 - Migration files committed to GitHub are not automatically applied to Supabase. Confirm the SQL editor reports success for every migration.
 - Test Row Level Security with at least two separate test shop-owner accounts and verify neither account can read or write the other's records.
 - The offline queue is stored in IndexedDB and is not encrypted by this app. Do not put real financial or identity information in it. Avoid shared devices.
 - Test interrupted requests and retry behaviour before relying on idempotency. Migration 004 adds the unique client_ref index used by sync.
-- The dedicated test Supabase project has migrations 001–014 applied. Browser credentials are not committed to the repository. Authenticated end-to-end tests have not yet been completed.
+- The dedicated test Supabase project has migrations 001–016 applied. Browser credentials are not committed to the repository. Authenticated end-to-end tests have not yet been completed.
 - Obtain adult oversight and appropriate legal/security review before any real-world use.
 
 ## Customer account foundation (migration 005)
@@ -59,7 +59,7 @@ A successful redemption is **not approval**. It does not link the account, show 
 The Supabase Edge Function runtime supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Never copy the service-role key into the app, browser, GitHub source, or chat.
 
 
-## Deployment preflight and verification (tasks 11–14)
+## Deployment preflight and verification (tasks 11–16)
 
 The repository includes a repeatable static preflight:
 
@@ -68,7 +68,7 @@ npm run check:supabase
 npm run build
 ```
 
-The preflight checks that all fourteen expected migration files are present, that no unexpected SQL migration is silently added to this reviewed deployment set, that all three Edge Functions exist with JWT verification enabled, and that service-role credential names do not appear in browser source or the browser environment example. GitHub Actions runs this preflight before the production build.
+The preflight checks that all sixteen expected migration files are present, that no unexpected SQL migration is silently added to this reviewed deployment set, that all three Edge Functions exist with JWT verification enabled, and that service-role credential names do not appear in browser source or the browser environment example. GitHub Actions runs this preflight before the production build.
 
 After linking a dedicated test project, use:
 
