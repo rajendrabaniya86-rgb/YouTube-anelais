@@ -79,6 +79,11 @@ export default function AuthGate({ children }) {
       <p className="auth-desc">उधार और जमा का हिसाब सुरक्षित और साफ तरीके से संभालें।</p>
       <form onSubmit={submit}>
         {mode === 'signup' && <>
+          <label htmlFor="account-type">खाते का प्रकार</label>
+          <select id="account-type" value={accountType} onChange={e => setAccountType(e.target.value)} required>
+            <option value="shop_owner">दुकानदार</option>
+            <option value="customer">ग्राहक</option>
+          </select>
           <label>आपका नाम</label><input value={name} onChange={e => setName(e.target.value)} placeholder="पूरा नाम" required/>
           {accountType === 'shop_owner' && <><label>दुकान का नाम</label><input value={shop} onChange={e => setShop(e.target.value)} placeholder="दुकान का नाम" required/></>}
         </>}
