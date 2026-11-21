@@ -173,6 +173,34 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   });
   assert(Boolean(revokedRedeem.error), 'Revoked invite codes are rejected');
 
+  // Two simultaneous redemption attempts for one invite must produce exactly one claim.
+  const concurrentInvite = await clientA.functions.invoke('create-customer-link-invite', {
+    body: { shopId: shopA, customerId: customerA.id, expiresInHours: 1 },
+  });
+  assert(!concurrentInvite.error && typeof concurrentInvite.data?.inviteCode === 'string',
+    'Shop owner can create an invite for concurrent-redemption testing');
+  const concurrentResults = await Promise.all([
+    clientCustomer.functions.invoke('redeem-customer-link-invite', {
+      body: { inviteCode: concurrentInvite.data.inviteCode },
+    }),
+    clientCustomer.functions.invoke('redeem-customer-link-invite', {
+      body: { inviteCode: concurrentInvite.data.inviteCode },
+    }),
+  ]);
+  const concurrentSuccesses = concurrentResults.filter((result) => !result.error && result.data?.status === 'pending').length;
+  const concurrentFailures = concurrentResults.filter((result) => Boolean(result.error)).length;
+  assert(concurrentSuccesses === 1 && concurrentFailures === 1,
+    'Concurrent redemption allows exactly one successful request');
+  const concurrentClaimCount = await admin.from('customer_link_claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('invite_id', (await must(admin.from('customer_link_invites').select('id')
+      .eq('created_by', ownerA.id)
+      .eq('token_hash', `\\x${createHash('sha256').update(concurrentInvite.data.inviteCode).digest('hex')}`)
+      .single(), 'find synthetic concurrent invite')).id);
+  if (concurrentClaimCount.error) throw new Error(`count concurrent claims: ${concurrentClaimCount.error.message}`);
+  assert(concurrentClaimCount.count === 1,
+    'Concurrent redemption creates exactly one pending claim');
+
   const invalidRedeem = await clientCustomer.functions.invoke('redeem-customer-link-invite', {
     body: { inviteCode: 'not-a-valid-invite' },
   });
