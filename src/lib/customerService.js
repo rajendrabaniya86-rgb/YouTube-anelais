@@ -19,7 +19,7 @@ export async function listLedgerEntries(shopId) {
 }
 export async function addLedgerEntry(shopId,userId,customerId,input) {
  if(!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
- const amount=Number(input.amount); if(!Number.isFinite(amount)||amount<=0) throw new Error('रकम शून्य से अधिक होनी चाहिए।');
+ const amount=Number(input.amount); if(!Number.isFinite(amount)||amount<=0||amount>999999999999.99||Math.round(amount*100)!==amount*100) throw new Error('रकम 0.01 से 999999999999.99 के बीच, अधिकतम दो दशमलव तक होनी चाहिए।');
  const {data,error}=await supabase.from('ledger_entries').insert({shop_id:shopId,customer_id:customerId,created_by:userId,entry_type:input.type,amount,note:(input.note||'').trim()}).select('id,shop_id,customer_id,entry_type,amount,note,created_at').single();
  if(error) throw error; return data;
 }
@@ -30,7 +30,7 @@ export async function syncOfflineLedgerDraft(shopId,userId,draft) {
  if(!shopId||!userId||draft.shopId!==shopId||draft.userId!==userId||!draft.id||!draft.customerId)
   throw new Error('ऑफलाइन ड्राफ्ट का खाता मेल नहीं खाता।');
  const amount=Number(draft.amount);
- if(!Number.isFinite(amount)||amount<=0||!['credit','payment'].includes(draft.type))
+ if(!Number.isFinite(amount)||amount<=0||amount>999999999999.99||Math.round(amount*100)!==amount*100||!['credit','payment'].includes(draft.type))
   throw new Error('ऑफलाइन ड्राफ्ट की रकम या प्रकार सही नहीं है।');
  const payload={shop_id:shopId,customer_id:draft.customerId,created_by:userId,
   entry_type:draft.type,amount,note:String(draft.note||'').trim(),client_ref:draft.id};
