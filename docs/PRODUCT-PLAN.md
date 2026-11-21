@@ -9,9 +9,10 @@ A simple, transparent ledger connecting a shopkeeper and a customer around the s
 3. Credit and payment entries with amount, timestamp, note, and creator.
 4. Balance computed from ledger entries, not manually overwritten.
 5. Customer statement and receipt.
-6. Customer invitation and consent flow.
-7. Dispute workflow and append-only audit events.
-8. Backup, export, and offline-safe sync.
+6. Customer account-to-record verification and customer-controlled consent flow (design documented; not implemented).
+7. Purpose-limited report sharing with immediate revocation and append-only access audit.
+8. Dispute workflow and append-only correction history.
+9. Backup, export, and offline-safe sync.
 
 ## Later capabilities
 - Customer-owned account spanning participating shops, only after identity verification and consent.
