@@ -50,6 +50,7 @@ function runTransaction(db, mode, action, fallbackMessage) {
 export async function saveOfflineLedgerDraft(input) {
   if (!input?.userId || !input?.shopId || !input?.customerId ||
       !Number.isFinite(Number(input.amount)) || Number(input.amount) <= 0 ||
+      Number(input.amount) > 999999999999.99 || Math.round(Number(input.amount) * 100) !== Number(input.amount) * 100 ||
       !['credit', 'payment'].includes(input.type)) {
     throw new Error('ऑफलाइन ड्राफ्ट की जानकारी सही नहीं है।');
   }
