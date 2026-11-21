@@ -80,6 +80,24 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   assert((await visibleIds(clientCustomer, 'customers', customerA.id)).length === 0, 'Customer cannot read Shop A customer record');
   assert((await visibleIds(clientCustomer, 'customers', customerB.id)).length === 0, 'Customer cannot read Shop B customer record');
 
+  // Requests made with only the public API key (no signed-in user JWT)
+  // must not cross any protected Edge Function boundary.
+  for (const functionName of [
+    'create-customer-link-invite',
+    'redeem-customer-link-invite',
+    'list-customer-link-claims',
+  ]) {
+    const unauthenticated = await publicClient.functions.invoke(functionName, {
+      body: functionName === 'create-customer-link-invite'
+        ? { shopId: shopA, customerId: customerA.id, expiresInHours: 1 }
+        : functionName === 'redeem-customer-link-invite'
+          ? { inviteCode: 'unauthenticated-test-code' }
+          : { shopId: shopA },
+    });
+    assert(Boolean(unauthenticated.error),
+      `Unauthenticated request is rejected by ${functionName}`);
+  }
+
   // Exercise the real Edge Function boundary with synthetic JWT sessions.
   const inviteResult = await clientA.functions.invoke('create-customer-link-invite', {
     body: { shopId: shopA, customerId: customerA.id, expiresInHours: 1 },
