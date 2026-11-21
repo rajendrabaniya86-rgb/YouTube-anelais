@@ -10,6 +10,8 @@ const requiredMigrations = [
   '006_protect_account_type.sql',
   '007_customer_link_invites.sql',
   '008_customer_link_claims.sql',
+  '009_function_privilege_hardening.sql',
+  '010_table_privilege_hardening.sql',
 ];
 const requiredFunctions = [
   'create-customer-link-invite',
