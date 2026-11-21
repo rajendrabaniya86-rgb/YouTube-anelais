@@ -36,3 +36,15 @@ Use a separate test Supabase project and synthetic records only.
 Migration 005 adds a `profiles.account_type` label and lets signup create a customer account without creating a shop. Migration 006 prevents an authenticated user from changing that database field through normal profile updates. The label is for interface routing only. It is not proof of identity and must never be used as authorization. Existing shop-owner RLS remains the data boundary.
 
 Customer accounts currently see a clear placeholder screen. They cannot link customer records, read shop ledgers, grant sharing permissions, or view another shop's data. Those features require a separately verified account-linking and customer-controlled consent implementation. Apply migration 005 after migration 004 before testing customer signup. Test with synthetic accounts only.
+
+
+## Customer link invitation function (migration 007)
+
+The Edge Function `create-customer-link-invite` creates a one-time code for a customer record. It verifies the caller's session, checks shop ownership and customer/shop matching with the caller's JWT, limits each owner to 10 code creations per hour, stores only a SHA-256 hash, and returns the raw code once. Codes expire after a selected 1–72 hours (24 by default).
+
+Deploy only after applying migrations 001–007:
+```sh
+supabase functions deploy create-customer-link-invite
+```
+
+The Supabase Edge Function runtime supplies `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Never copy the service-role key into the app, browser, GitHub source, or chat. The function does not redeem codes, verify identity, create a customer link, or reveal ledger information. Do not share real customer information; use synthetic records while testing.
