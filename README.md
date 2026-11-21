@@ -1,35 +1,54 @@
 # GLOBAL TRUST NETWORK
 
-A privacy-first digital ledger for small shops and their customers.
+A privacy-first, Hindi-first digital ledger prototype for small shops.
 
-## Current stage
-This repository is being rebuilt from the former YouTube demo into the Global Trust Network project. The current commit creates the first frontend prototype only. It uses local demo data in the browser; it does **not** yet provide real accounts, cloud sync, payments, AI credit decisions, or production security.
+## Current implementation status
 
-## MVP direction
-- Shop dashboard with total receivables and recent activity
-- Customer ledger with credit and payment entries
-- Clear balance calculations and transaction history
-- Consent-first sharing and dispute-ready audit design
-- Hindi-first, mobile-friendly interface
+This branch contains a working frontend prototype and an in-progress Supabase backend foundation:
+
+- Shop-owner signup/login UI (requires Supabase configuration).
+- Demo customer records, credit/payment entries, statements, reports, CSV export, and in-app reminders.
+- Supabase schema and row-level security migrations for shop-scoped records.
+- IndexedDB storage for offline ledger drafts.
+- An idempotent server-side upload helper and database uniqueness migration for safe retry handling.
+
+## Important limitations
+
+This is **not production-ready** and must use fake test data only until reviewed and tested:
+
+- Supabase project credentials have not been configured in this repository.
+- SQL migrations must be applied manually in order and tested against two separate test shop accounts.
+- Offline drafts can be saved locally, but the app's pending-draft review and user-triggered sync screen are not yet complete.
+- Browser IndexedDB data is not encrypted by this app.
+- Customer self-service, verified consent, cross-shop sharing, dispute workflow, notifications, and AI summaries are not implemented as production features.
+- No real device, database integration, penetration, or end-to-end acceptance test has been completed.
+- A successful hosting build does not prove database or security behavior.
 
 ## Run locally
+
 ```bash
 npm install
 npm run dev
 ```
 
-## Planned architecture
-- Frontend: React + Vite
-- Backend: Supabase Auth + PostgreSQL with Row Level Security
-- Offline: IndexedDB and an explicit sync queue
-- Hosting: Vercel
-- AI: explainable summaries only, never an automatic lending decision
+## Supabase setup
 
-## Privacy principles
-1. A shop sees only its own customer and transaction records.
-2. Cross-shop sharing requires clear, purpose-specific customer consent.
-3. No public payer blacklist or permanent character score.
-4. Corrections create an audit event; settled history is not silently erased.
-5. Never store raw fingerprint or face data.
+Follow [docs/SUPABASE-SETUP.md](docs/SUPABASE-SETUP.md). Apply migrations in numeric order:
+
+1. `supabase/migrations/001_initial_schema.sql`
+2. `supabase/migrations/002_security_hardening.sql`
+3. `supabase/migrations/003_payment_reminders.sql`
+4. `supabase/migrations/004_ledger_offline_idempotency.sql`
+
+Only use a Supabase publishable/anon key in the browser. Never expose a service-role key.
+
+## Product and privacy principles
+
+- A shop sees only its own customer and transaction records.
+- Cross-shop sharing requires clear, purpose-specific, verified customer consent.
+- No public payer blacklist or permanent character score.
+- Financial corrections must preserve history rather than silently overwrite it.
+- Never store raw fingerprint or face data.
+- AI may explain verified transaction patterns, but must not make automatic lending decisions.
 
 See [docs/PRODUCT-PLAN.md](docs/PRODUCT-PLAN.md) and [docs/SECURITY-PRINCIPLES.md](docs/SECURITY-PRINCIPLES.md).
