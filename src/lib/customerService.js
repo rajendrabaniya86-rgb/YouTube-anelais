@@ -89,3 +89,21 @@ export async function listPendingCustomerClaims(shopId) {
  if (!data || !Array.isArray(data.claims)) throw new Error('अनुरोध सूची का जवाब सही नहीं है।');
  return data.claims;
 }
+
+
+/** Create a one-time customer invitation. The raw code is returned once only. */
+export async function createCustomerLinkInvite(shopId, customerId, expiresInHours = 24) {
+ if (!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
+ if (!shopId || !customerId) throw new Error('दुकान और ग्राहक रिकॉर्ड चुनें।');
+ if (!Number.isInteger(expiresInHours) || expiresInHours < 1 || expiresInHours > 72) {
+  throw new Error('कोड की समय-सीमा 1 से 72 घंटे के बीच रखें।');
+ }
+ const { data, error } = await supabase.functions.invoke('create-customer-link-invite', {
+  body: { shopId, customerId, expiresInHours }
+ });
+ if (error) throw error;
+ if (!data || typeof data.inviteCode !== 'string' || !data.expiresAt) {
+  throw new Error('निमंत्रण सेवा से सही जवाब नहीं मिला।');
+ }
+ return data;
+}
