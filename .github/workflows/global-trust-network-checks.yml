@@ -1,0 +1,30 @@
+name: Global Trust Network checks
+
+on:
+  push:
+    branches:
+      - rebuild/global-trust-network
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gtn-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Check Supabase configuration and migrations
+        run: npm run check:supabase
+      - name: Build production app
+        run: npm run build
