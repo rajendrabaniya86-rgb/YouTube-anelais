@@ -39,7 +39,7 @@ export default function AuthGate({ children }) {
     if (!supabase || !hasSupabaseConfig) return setMessage('Supabase कनेक्ट नहीं है। अभी डेमो मोड इस्तेमाल करें।');
     if (password.length < 8) return setMessage('पासवर्ड कम से कम 8 अक्षर का रखें।');
     if (mode === 'signup' && (!name.trim() || (accountType === 'shop_owner' && !shop.trim()))) {
-      return setMessage('अपना नाम और दुकान का नाम भरें।');
+      return setMessage('अपना नाम भरें। दुकानदार के लिए दुकान का नाम भी भरें।');
     }
 
     setSubmitting(true);
