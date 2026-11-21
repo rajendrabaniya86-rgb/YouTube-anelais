@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowRight, ShieldCheck, Store } from 'lucide-react';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
+import { redeemCustomerLinkInvite } from './lib/customerService';
 
 export default function AuthGate({ children }) {
   const [session, setSession] = useState(null);
@@ -14,6 +15,7 @@ export default function AuthGate({ children }) {
   const [demo, setDemo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [accountType, setAccountType] = useState('shop_owner');
+  const [inviteCode, setInviteCode] = useState('');
 
   useEffect(() => {
     if (!supabase) return;
@@ -66,8 +68,21 @@ export default function AuthGate({ children }) {
     }
   }
 
+  async function redeemInvite(e) {
+    e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true); setMessage('');
+    try {
+      const result = await redeemCustomerLinkInvite(inviteCode);
+      setInviteCode('');
+      setMessage(result.message || 'अनुरोध जमा हो गया है। अभी दुकान का हिसाब उपलब्ध नहीं है।');
+    } catch (error) {
+      setMessage(error?.message || 'निमंत्रण कोड इस्तेमाल नहीं हो सका।');
+    } finally { setSubmitting(false); }
+  }
+
   if (loading) return <div className="auth-loading">सुरक्षित लॉगिन जाँचा जा रहा है…</div>;
-  if (session && session.user?.user_metadata?.account_type === 'customer') return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><span><ShieldCheck size={27}/></span><div><b>GLOBAL TRUST</b><small>NETWORK</small></div></div><div className="auth-kicker"><ShieldCheck size={14}/> ग्राहक पोर्टल</div><h1>आपका ग्राहक खाता बन गया है</h1><p className="auth-desc">अभी ग्राहक रिकॉर्ड जोड़ने या दूसरी दुकानों का हिसाब देखने की सुविधा चालू नहीं है। आपकी अनुमति और पहचान सत्यापन की व्यवस्था बनने तक कोई दुकान का डेटा साझा नहीं होगा।</p><div className="auth-message" role="status">आपका खाता सुरक्षित है। अभी कोई दुकान रिकॉर्ड इससे लिंक नहीं है।</div><button className="primary-btn auth-submit" onClick={() => supabase.auth.signOut()}>लॉग आउट</button></section></main>;
+  if (session && session.user?.user_metadata?.account_type === 'customer') return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><span><ShieldCheck size={27}/></span><div><b>GLOBAL TRUST</b><small>NETWORK</small></div></div><div className="auth-kicker"><ShieldCheck size={14}/> ग्राहक पोर्टल</div><h1>अपना ग्राहक रिकॉर्ड जोड़ें</h1><p className="auth-desc">दुकानदार से मिला एक बार का निमंत्रण कोड यहाँ दर्ज करें। अनुरोध जमा होने पर भी दुकान का बैलेंस या लेन-देन नहीं दिखेगा। पहले दुकानदार की जाँच और सुरक्षित मंजूरी जरूरी है।</p><form onSubmit={redeemInvite}><label>निमंत्रण कोड</label><input value={inviteCode} onChange={e=>setInviteCode(e.target.value.trim())} placeholder="दुकानदार से मिला कोड" minLength="40" maxLength="50" autoComplete="off" required/><button className="primary-btn auth-submit" type="submit" disabled={submitting}>{submitting?'जाँच हो रही है…':'निमंत्रण कोड जमा करें'} <ArrowRight size={17}/></button></form>{message&&<div className="auth-message" role="status">{message}</div>}<button className="auth-switch" onClick={() => supabase.auth.signOut()}>लॉग आउट</button></section></main>
   if (session) return <>{React.cloneElement(children, { mode: 'live', user: session.user })}<button className="signout-fab" onClick={() => supabase.auth.signOut()}>लॉग आउट</button></>;
   if (demo) return <>{React.cloneElement(children, { mode: 'demo', user: null })}<div className="demo-banner">डेमो मोड: नमूना डेटा ही दिखाया जा रहा है। <button onClick={() => setDemo(false)}>लॉगिन पर लौटें</button></div></>;
 
