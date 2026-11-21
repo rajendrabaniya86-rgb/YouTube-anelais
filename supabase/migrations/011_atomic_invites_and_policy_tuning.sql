@@ -75,7 +75,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $audit$
 declare
   row_data jsonb;
   event_shop_id uuid;
@@ -117,7 +117,7 @@ begin
   if TG_OP = 'DELETE' then return OLD; end if;
   return NEW;
 end;
-$;
+$audit$;
 
 revoke all on function public.write_audit_event() from public, anon, authenticated;
 
