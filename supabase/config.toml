@@ -3,3 +3,6 @@ verify_jwt = true
 
 [functions.redeem-customer-link-invite]
 verify_jwt = true
+
+[functions.list-customer-link-claims]
+verify_jwt = true
