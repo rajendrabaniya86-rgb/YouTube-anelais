@@ -133,4 +133,35 @@ describe('session and account UI isolation', () => {
     expect(mocks.removeOfflineLedgerDraft).toHaveBeenCalledWith('draft-a', 'user-a', 'shop-user-a');
   });
 
+
+  it('hides already-loaded Account A rows immediately when switching to Account B', async () => {
+    const requestB = deferred();
+    mocks.listCustomers.mockImplementation(userId => userId === 'user-a'
+      ? Promise.resolve(customerData('user-a', 'ACCOUNT_A_VISIBLE_BEFORE_SWITCH'))
+      : requestB.promise);
+
+    const view = render(<App mode="live" user={{ id: 'user-a', email: 'a@example.test' }} />);
+    expect(await screen.findByText('ACCOUNT_A_VISIBLE_BEFORE_SWITCH')).toBeTruthy();
+
+    view.rerender(<App mode="live" user={{ id: 'user-b', email: 'b@example.test' }} />);
+    expect(screen.queryByText('ACCOUNT_A_VISIBLE_BEFORE_SWITCH')).toBeNull();
+    expect(screen.getByText('नई दुकान और उसके रिकॉर्ड की पुष्टि हो रही है…')).toBeTruthy();
+
+    await act(async () => { requestB.resolve(customerData('user-b', 'ACCOUNT_B_AFTER_SWITCH')); });
+    expect(await screen.findByText('ACCOUNT_B_AFTER_SWITCH')).toBeTruthy();
+    expect(screen.queryByText('ACCOUNT_A_VISIBLE_BEFORE_SWITCH')).toBeNull();
+  });
+
+  it('never hydrates live account UI from the device demo cache', async () => {
+    localStorage.setItem('gtn-demo-customers', JSON.stringify([{ id: 'demo-secret', display_name: 'DEMO_CACHE_ACCOUNT_A', phone: '', notes: '' }]));
+    localStorage.setItem('gtn-demo-entries', JSON.stringify([{ id: 'demo-entry', customer_id: 'demo-secret', entry_type: 'credit', amount: 9900, note: 'DEMO_PRIVATE_LEDGER_A', created_at: new Date().toISOString() }]));
+    mocks.listCustomers.mockResolvedValue(customerData('user-b', 'LIVE_ACCOUNT_B_ONLY'));
+
+    render(<App mode="live" user={{ id: 'user-b', email: 'b@example.test' }} />);
+    expect(screen.queryByText('DEMO_CACHE_ACCOUNT_A')).toBeNull();
+    expect(screen.queryByText('DEMO_PRIVATE_LEDGER_A')).toBeNull();
+    expect(await screen.findByText('LIVE_ACCOUNT_B_ONLY')).toBeTruthy();
+    expect(screen.queryByText('DEMO_CACHE_ACCOUNT_A')).toBeNull();
+  });
+
 });
