@@ -1,8 +1,15 @@
 import { supabase } from './supabase';
-export async function listCustomers() {
+export async function listCustomers(userId) {
  if (!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
- const {data:shops,error:se}=await supabase.from('shops').select('id,shop_name').order('created_at').limit(1);
- if(se) throw se; if(!shops?.length) throw new Error('इस खाते की दुकान नहीं मिली। Supabase migration और दुकान रिकॉर्ड जाँचें।');
+ if (!userId) throw new Error('लॉगिन उपयोगकर्ता की जानकारी नहीं मिली।');
+ // Explicitly scope the shop lookup to the signed-in owner. RLS is a second
+ // enforcement layer, not a substitute for an explicit owner filter.
+ const {data:shops,error:se}=await supabase.from('shops')
+  .select('id,shop_name').eq('owner_id',userId).order('created_at',{ascending:true});
+ if(se) throw se;
+ if(!shops?.length) throw new Error('इस लॉगिन खाते की दुकान नहीं मिली।');
+ // Do not silently choose the first shop if multi-shop support is added later.
+ if(shops.length>1) throw new Error('इस खाते में एक से अधिक दुकानें हैं। सुरक्षित दुकान चयन सुविधा जुड़ने तक लाइव रिकॉर्ड नहीं खोले गए।');
  const shop=shops[0];
  const {data,error}=await supabase.from('customers').select('id,shop_id,display_name,phone,notes,created_at').eq('shop_id',shop.id).order('created_at',{ascending:false});
  if(error) throw error;
