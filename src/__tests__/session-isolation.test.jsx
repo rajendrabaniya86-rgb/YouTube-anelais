@@ -75,7 +75,7 @@ describe('session and account UI isolation', () => {
     render(<AuthGate><div data-testid="private-child">Private account screen</div></AuthGate>);
     await waitFor(() => expect(mocks.authListener).toBeTypeOf('function'));
 
-    fireEvent.change(screen.getByLabelText('ईमेल'), { target: { value: 'old-account@example.test' } });
+    fireEvent.change(screen.getByPlaceholderText('you@example.com'), { target: { value: 'old-account@example.test' } });
     await act(async () => {
       mocks.authListener('SIGNED_IN', {
         user: { id: 'user-a', email: 'old-account@example.test', user_metadata: { account_type: 'shop_owner' } }
