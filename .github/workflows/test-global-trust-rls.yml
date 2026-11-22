@@ -23,6 +23,8 @@ jobs:
         run: npm install
       - name: Test offline ledger service
         run: npm run test:offline-ledger-service
+      - name: Test ledger arithmetic and balance
+        run: npm run test:ledger-math
       - name: Run isolated synthetic-account RLS tests
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
