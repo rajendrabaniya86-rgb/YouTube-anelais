@@ -24,7 +24,16 @@ export default function App({mode='demo',user=null}){
  useEffect(()=>{const up=()=>setOnline(true),down=()=>setOnline(false);window.addEventListener('online',up);window.addEventListener('offline',down);return()=>{window.removeEventListener('online',up);window.removeEventListener('offline',down)}},[]);
  useEffect(()=>{if(demo){try{localStorage.setItem('gtn-demo-customers',JSON.stringify(customers));localStorage.setItem('gtn-demo-entries',JSON.stringify(entries));localStorage.setItem('gtn-demo-reminders',JSON.stringify(reminders))}catch{};}},[demo,customers,entries,reminders]);
  useLayoutEffect(()=>{
-  if(demo)return;
+  if(demo){
+   try{
+    setCustomers(JSON.parse(localStorage.getItem('gtn-demo-customers'))||sample);
+    setEntries(JSON.parse(localStorage.getItem('gtn-demo-entries'))||[]);
+    setReminders(JSON.parse(localStorage.getItem('gtn-demo-reminders'))||[]);
+   }catch{setCustomers(sample);setEntries([]);setReminders([]);}
+   setLoadedUserId(null);setShop(null);setPendingDrafts([]);setClaims([]);
+   setSelected(null);setModal('');setInviteResult(null);setError('');setNotice('');
+   return;
+  }
   setLoadedUserId(null);
   setShop(null);setCustomers([]);setEntries([]);setReminders([]);setPendingDrafts([]);
   setClaims([]);setClaimsLoaded(false);setClaimsLoading(false);
