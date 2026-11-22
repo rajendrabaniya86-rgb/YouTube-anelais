@@ -7,6 +7,23 @@ import { hasSupabaseConfig, supabase } from './lib/supabase';
 import { redeemCustomerLinkInvite } from './lib/customerService';
 import { shouldApplyInitialSession } from './lib/sessionGuards';
 
+function friendlyAuthError(error) {
+  const raw = String(error?.message || error || '').toLowerCase();
+  if (raw.includes('email rate limit') || raw.includes('over_email_send_rate_limit') || raw.includes('rate limit exceeded')) {
+    return 'ईमेल भेजने की Supabase सीमा पूरी हो गई है। अभी बार-बार कोशिश न करें। SMTP सेवा कॉन्फ़िगर होने तक नया पुष्टि ईमेल नहीं भेजा जा सकेगा।';
+  }
+  if (raw.includes('failed to fetch') || raw.includes('networkerror') || raw.includes('load failed') || raw.includes('fetch')) {
+    return 'Supabase सर्वर तक कनेक्शन नहीं बन पाया। इंटरनेट जाँचें और कुछ देर बाद फिर प्रयास करें।';
+  }
+  if (raw.includes('email not confirmed') || raw.includes('email_not_confirmed')) {
+    return 'इस ईमेल की पुष्टि बाकी है। Inbox और Spam में पुष्टि लिंक देखें।';
+  }
+  if (raw.includes('invalid login credentials')) return 'ईमेल या पासवर्ड सही नहीं है।';
+  if (raw.includes('user already registered')) return 'इस ईमेल से खाता पहले से मौजूद है। लॉगिन करें या पासवर्ड रीसेट करें।';
+  if (raw.includes('password should be at least')) return 'पासवर्ड कम से कम 8 अक्षर का रखें।';
+  return error?.message || 'लॉगिन सेवा से अनुरोध पूरा नहीं हो पाया। कुछ देर बाद फिर प्रयास करें।';
+}
+
 export default function AuthGate({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(hasSupabaseConfig);
@@ -213,10 +230,10 @@ export default function AuthGate({ children }) {
     } catch (error) {
       const raw = String(error?.message || '').toLowerCase();
       if (raw.includes('rate') || raw.includes('too many') || raw.includes('after')) {
-        setResendSeconds(60);
-        setMessage('ईमेल अभी हाल में भेजा गया है। सुरक्षा के लिए 60 सेकंड रुककर फिर प्रयास करें।');
+        setResendSeconds(300);
+        setMessage(friendlyAuthError(error) + ' पाँच मिनट बाद ही दोबारा प्रयास करें।');
       } else {
-        setMessage(error?.message || 'पुष्टि ईमेल नहीं भेजा जा सका। थोड़ी देर बाद फिर प्रयास करें।');
+        setMessage(friendlyAuthError(error));
       }
     } finally { setSubmitting(false); }
   }
@@ -351,7 +368,7 @@ export default function AuthGate({ children }) {
         setPendingVerificationEmail(email.trim());
         setMessage('इस ईमेल की पुष्टि अभी बाकी है। Inbox/Spam देखें या नीचे से पुष्टि ईमेल दोबारा भेजें।');
       } else {
-        setMessage(error?.message || 'लॉगिन सेवा से संपर्क नहीं हो पाया। इंटरनेट जाँचकर फिर कोशिश करें।');
+        setMessage(friendlyAuthError(error));
       }
     } finally {
       setSubmitting(false);
