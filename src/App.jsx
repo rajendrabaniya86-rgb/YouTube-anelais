@@ -115,11 +115,12 @@ export default function App({mode='demo',user=null}){
    if(!stillSameScope())return;
    setPendingDrafts(drafts);
    for(const draft of drafts){
+    if(!stillSameScope())break;
     try{
      const result=await syncOfflineLedgerDraft(scopeShopId,scopeUserId,draft);
      const removed=await removeOfflineLedgerDraft(draft.id,scopeUserId,scopeShopId);
      if(!removed)throw new Error('ड्राफ्ट की दुकान/लॉगिन जाँच पूरी नहीं हुई। ड्राफ्ट सुरक्षित रखा गया है।');
-     if(!stillSameScope())continue;
+     if(!stillSameScope())break;
      setPendingDrafts(old=>old.filter(x=>x.id!==draft.id));
      setEntries(old=>old.some(x=>x.client_ref===draft.id||x.id===result.row.id)?old:[result.row,...old]);
      synced++;
