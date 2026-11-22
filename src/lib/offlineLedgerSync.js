@@ -44,3 +44,51 @@ export async function syncOfflineLedgerDraftWithClient(client, shopId, userId, d
   }
   return { row: existing, outcome: 'already_synced' };
 }
+
+
+const DEFAULT_RETRY_ATTEMPTS = 3;
+const DEFAULT_RETRY_BASE_DELAY_MS = 300;
+const DEFAULT_RETRY_MAX_DELAY_MS = 3000;
+
+function isRetryableLedgerError(error) {
+  const code = String(error?.code || '');
+  const status = Number(error?.status || error?.statusCode || error?.context?.status || 0);
+  const message = String(error?.message || '').toLowerCase();
+  if (error?.name === 'AbortError' || error?.name === 'TimeoutError') return true;
+  if (['408', '429', '500', '502', '503', '504'].includes(String(status))) return true;
+  if (/^(08|40)/.test(code) || ['55P03', '57014'].includes(code)) return true;
+  return /failed to fetch|network request failed|fetch failed|connection reset|timed out|timeout|temporarily unavailable|socket hang up/.test(message);
+}
+
+/**
+ * Bounded retry wrapper for transient transport/database failures only.
+ * Validation, authentication, permission, and payload-conflict errors are not retried.
+ * The underlying sync function retains client_ref idempotency for ambiguous commits.
+ */
+export async function syncOfflineLedgerDraftWithRetry(
+  client, shopId, userId, draft,
+  { maxAttempts = DEFAULT_RETRY_ATTEMPTS, baseDelayMs = DEFAULT_RETRY_BASE_DELAY_MS,
+    maxDelayMs = DEFAULT_RETRY_MAX_DELAY_MS, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {},
+) {
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 5 ||
+      !Number.isFinite(baseDelayMs) || baseDelayMs < 0 ||
+      !Number.isFinite(maxDelayMs) || maxDelayMs < 0) {
+    throw new Error('Retry configuration is invalid.');
+  }
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await syncOfflineLedgerDraftWithClient(client, shopId, userId, draft);
+    } catch (error) {
+      if (!isRetryableLedgerError(error) || attempt === maxAttempts) {
+        if (isRetryableLedgerError(error) && attempt === maxAttempts) {
+          error.retryExhausted = true;
+          error.retryAttempts = attempt;
+        }
+        throw error;
+      }
+      const delay = Math.min(baseDelayMs * (2 ** (attempt - 1)), maxDelayMs);
+      await sleep(delay);
+    }
+  }
+  throw new Error('Offline ledger retry ended unexpectedly.');
+}
