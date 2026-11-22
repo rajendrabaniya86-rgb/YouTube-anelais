@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowRight, ShieldCheck, Store } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Store, Github } from 'lucide-react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
@@ -161,7 +161,7 @@ export default function AuthGate({ children }) {
     })();
   }, [session?.user?.id]);
 
-  async function signInWithGoogle() {
+  async function signInWithGitHub() {\n    if (submitting || !supabase || !hasSupabaseConfig) {\n      if (!supabase) setMessage('GitHub लॉगिन के लिए Supabase कनेक्शन जरूरी है।');\n      return;\n    }\n    setSubmitting(true);\n    setMessage('');\n    let pendingProfile = null;\n    try {\n      if (mode === 'signup') {\n        if (!name.trim()) throw new Error('GitHub से खाता बनाने से पहले अपना नाम लिखें।');\n        if (accountType === 'shop_owner' && !shop.trim()) throw new Error('दुकान का नाम लिखें।');\n        pendingProfile = { fullName: name.trim(), accountType, shopName: accountType === 'shop_owner' ? shop.trim() : '' };\n        localStorage.setItem('gtn_google_signup_profile', JSON.stringify(pendingProfile));\n        setGoogleSetup(true);\n      }\n      const native = Capacitor.isNativePlatform();\n      const { data, error } = await supabase.auth.signInWithOAuth({\n        provider: 'github',\n        options: {\n          ...(native ? { redirectTo: appAuthRedirectTo, skipBrowserRedirect: true } : {}),\n          scopes: 'read:user user:email'\n        }\n      });\n      if (error) throw error;\n      if (native) {\n        if (!data?.url) throw new Error('GitHub लॉगिन लिंक नहीं मिला।');\n        await Browser.open({ url: data.url });\n        setSubmitting(false);\n        setGoogleSetup(false);\n      } else if (!data?.url) throw new Error('GitHub लॉगिन लिंक नहीं मिला।');\n    } catch (error) {\n      if (pendingProfile) { try { localStorage.removeItem('gtn_google_signup_profile'); } catch {} setGoogleSetup(false); }\n      setMessage(friendlyAuthError(error) || 'GitHub लॉगिन शुरू नहीं हो पाया। Supabase में GitHub Provider सेटिंग जाँचें।');\n      setSubmitting(false);\n    }\n  }\n\n  async function signInWithGoogle() {
     if (submitting || !supabase || !hasSupabaseConfig) {
       if (!supabase) setMessage('Google लॉगिन के लिए Supabase कनेक्शन जरूरी है।');
       return;
@@ -432,6 +432,9 @@ export default function AuthGate({ children }) {
       <div className="auth-divider"><span>या</span></div>
       <button className="google-auth-btn" type="button" onClick={signInWithGoogle} disabled={submitting || googleSetup}>
         <span className="google-mark">G</span>{submitting ? 'कृपया प्रतीक्षा करें…' : mode === 'login' ? 'Google से लॉगिन करें' : 'Google से खाता बनाएँ'}
+      </button>
+      <button className="google-auth-btn" type="button" onClick={signInWithGitHub} disabled={submitting || googleSetup}>
+        <Github size={19}/>{submitting ? 'कृपया प्रतीक्षा करें…' : mode === 'login' ? 'GitHub से लॉगिन करें' : 'GitHub से खाता बनाएँ'}
       </button>
       <button className="auth-switch" onClick={() => {setMode(mode === 'login' ? 'signup' : 'login');setMessage('');}}>{mode === 'login' ? 'नया खाता बनाना है? रजिस्टर करें' : 'पहले से खाता है? लॉगिन करें'}</button>
       <div className="auth-foot"><ShieldCheck size={15}/> सुरक्षित कनेक्शन • निजी दुकान डेटा</div>
