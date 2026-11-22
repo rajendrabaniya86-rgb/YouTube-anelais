@@ -153,6 +153,8 @@ export default function AuthGate({ children }) {
       if (native) {
         if (!data?.url) throw new Error('Google लॉगिन लिंक नहीं मिला।');
         await Browser.open({ url: data.url });
+        setSubmitting(false);
+        setGoogleSetup(false);
       } else if (!data?.url) {
         throw new Error('Google लॉगिन लिंक नहीं मिला।');
       }
