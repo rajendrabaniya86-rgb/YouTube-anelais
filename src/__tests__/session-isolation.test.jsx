@@ -164,4 +164,25 @@ describe('session and account UI isolation', () => {
     expect(screen.queryByText('DEMO_CACHE_ACCOUNT_A')).toBeNull();
   });
 
+
+  it('shows and syncs only drafts belonging to the exact active user and shop', async () => {
+    const draftA = { id: 'draft-a', userId: 'user-a', shopId: 'shop-user-a', customerId: 'customer-user-a', type: 'credit', amount: 10, note: 'PRIVATE_DRAFT_A', createdAt: new Date().toISOString() };
+    const draftWrongShop = { id: 'draft-wrong-shop', userId: 'user-b', shopId: 'shop-other', customerId: 'customer-user-b', type: 'credit', amount: 20, note: 'WRONG_SHOP_DRAFT', createdAt: new Date().toISOString() };
+    const draftB = { id: 'draft-b', userId: 'user-b', shopId: 'shop-user-b', customerId: 'customer-user-b', type: 'credit', amount: 30, note: 'ACTIVE_SHOP_DRAFT_B', createdAt: new Date().toISOString() };
+    mocks.listCustomers.mockResolvedValue(customerData('user-b', 'ACCOUNT_B_CUSTOMER'));
+    mocks.listOfflineLedgerDrafts.mockResolvedValue([draftA, draftWrongShop, draftB]);
+    mocks.syncOfflineLedgerDraft.mockResolvedValue({ row: { id: 'ledger-b', customer_id: 'customer-user-b', entry_type: 'credit', amount: 30, created_at: new Date().toISOString() } });
+
+    render(<App mode="live" user={{ id: 'user-b', email: 'b@example.test' }} />);
+    await waitFor(() => expect(mocks.listOfflineLedgerDrafts).toHaveBeenCalledWith('user-b', 'shop-user-b'));
+    fireEvent.click(await screen.findByRole('button', { name: /ऑफलाइन ड्राफ्ट/ }));
+    expect(await screen.findByText(/ACTIVE_SHOP_DRAFT_B/)).toBeTruthy();
+    expect(screen.queryByText(/PRIVATE_DRAFT_A/)).toBeNull();
+    expect(screen.queryByText(/WRONG_SHOP_DRAFT/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'सभी सिंक करें' }));
+    await waitFor(() => expect(mocks.syncOfflineLedgerDraft).toHaveBeenCalledTimes(1));
+    expect(mocks.syncOfflineLedgerDraft).toHaveBeenCalledWith('shop-user-b', 'user-b', draftB);
+  });
+
 });
