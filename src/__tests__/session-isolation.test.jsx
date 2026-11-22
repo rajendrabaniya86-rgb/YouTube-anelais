@@ -109,4 +109,28 @@ describe('session and account UI isolation', () => {
     expect(await screen.findByText('ACCOUNT_B_CUSTOMER')).toBeTruthy();
     expect(screen.queryByText('SECRET_ACCOUNT_A')).toBeNull();
   });
+
+  it('keeps an in-flight offline sync scoped to Account A after switching to Account B', async () => {
+    const syncRequest = deferred();
+    const draft = { id: 'draft-a', userId: 'user-a', shopId: 'shop-user-a', customerId: 'customer-user-a', type: 'credit', amount: 25, note: '', createdAt: new Date().toISOString() };
+    mocks.listCustomers.mockImplementation(userId => Promise.resolve(customerData(userId, userId === 'user-a' ? 'ACCOUNT_A_CUSTOMER' : 'ACCOUNT_B_CUSTOMER')));
+    mocks.listOfflineLedgerDrafts.mockImplementation(userId => Promise.resolve(userId === 'user-a' ? [draft] : []));
+    mocks.syncOfflineLedgerDraft.mockReturnValue(syncRequest.promise);
+
+    const view = render(<App mode="live" user={{ id: 'user-a', email: 'a@example.test' }} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: /ऑफलाइन ड्राफ्ट/ })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /ऑफलाइन ड्राफ्ट/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'सभी सिंक करें' }));
+    await waitFor(() => expect(mocks.syncOfflineLedgerDraft).toHaveBeenCalledWith('shop-user-a', 'user-a', draft));
+
+    view.rerender(<App mode="live" user={{ id: 'user-b', email: 'b@example.test' }} />);
+    await act(async () => {
+      syncRequest.resolve({ row: { id: 'ledger-a', customer_id: 'customer-user-a', entry_type: 'credit', amount: 25, created_at: new Date().toISOString() } });
+    });
+
+    expect(await screen.findByText('ACCOUNT_B_CUSTOMER')).toBeTruthy();
+    expect(screen.queryByText('ACCOUNT_A_CUSTOMER')).toBeNull();
+    expect(mocks.removeOfflineLedgerDraft).toHaveBeenCalledWith('draft-a', 'user-a', 'shop-user-a');
+  });
+
 });
