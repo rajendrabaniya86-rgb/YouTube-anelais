@@ -15,6 +15,10 @@ export default function AuthGate({ children }) {
   const [shop, setShop] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [authMethod, setAuthMethod] = useState('email');
+  const [phone, setPhone] = useState('+977');
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [message, setMessage] = useState('');
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState('');
   const [resendSeconds, setResendSeconds] = useState(0);
@@ -238,6 +242,76 @@ export default function AuthGate({ children }) {
     }
   }
 
+  function normalizedPhone() {
+    const compact = phone.replace(/[\\s()-]/g, '');
+    if (/^9[78]\\d{8}$/.test(compact)) return `+977${compact}`;
+    if (/^\\+?[1-9]\\d{7,14}$/.test(compact)) return compact.startsWith('+') ? compact : `+${compact}`;
+    throw new Error('देश कोड सहित सही मोबाइल नंबर लिखें, जैसे +97798XXXXXXXX।');
+  }
+
+  async function sendWhatsappOtp(e) {
+    e.preventDefault();
+    if (submitting || !supabase) return;
+    setMessage('');
+    if (mode === 'signup' && (!name.trim() || (accountType === 'shop_owner' && !shop.trim()))) {
+      setMessage('अपना नाम भरें। दुकानदार के लिए दुकान का नाम भी भरें।');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const targetPhone = normalizedPhone();
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: targetPhone,
+        options: {
+          channel: 'whatsapp',
+          data: mode === 'signup'
+            ? { full_name: name.trim(), account_type: accountType, ...(accountType === 'shop_owner' ? { shop_name: shop.trim() } : {}) }
+            : undefined
+        }
+      });
+      if (error) throw error;
+      setPhone(targetPhone);
+      setPhoneOtpSent(true);
+      setPhoneOtp('');
+      setResendSeconds(60);
+      setMessage('WhatsApp पर OTP भेजने का अनुरोध सफल रहा। WhatsApp में आया 6 अंकों का कोड यहाँ भरें।');
+    } catch (error) {
+      const raw = String(error?.message || '').toLowerCase();
+      if (raw.includes('rate') || raw.includes('too many')) {
+        setResendSeconds(60);
+        setMessage('OTP भेजने की सीमा पूरी हुई है। कुछ समय बाद फिर कोशिश करें।');
+      } else if (raw.includes('fetch')) {
+        setMessage('सर्वर से संपर्क नहीं हो पाया। इंटरनेट और Supabase कनेक्शन जाँचें।');
+      } else {
+        setMessage(error?.message || 'WhatsApp OTP नहीं भेजा जा सका। Supabase में Phone/WhatsApp Provider सेटिंग जाँचें।');
+      }
+    } finally { setSubmitting(false); }
+  }
+
+  async function verifyWhatsappOtp(e) {
+    e.preventDefault();
+    if (submitting || !supabase) return;
+    if (!/^\\d{6}$/.test(phoneOtp.trim())) {
+      setMessage('WhatsApp पर मिला 6 अंकों का OTP लिखें।');
+      return;
+    }
+    setSubmitting(true);
+    setMessage('');
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        phone: normalizedPhone(),
+        token: phoneOtp.trim(),
+        type: 'sms'
+      });
+      if (error) throw error;
+      setMessage('मोबाइल नंबर सत्यापित हो गया। लॉगिन पूरा हो रहा है।');
+      setPhoneOtpSent(false);
+      setPhoneOtp('');
+    } catch (error) {
+      setMessage(error?.message || 'OTP गलत या समाप्त हो चुका है। नया OTP मँगाकर फिर प्रयास करें।');
+    } finally { setSubmitting(false); }
+  }
+
   async function submit(e) {
     e.preventDefault();
     if (submitting) return;
@@ -307,22 +381,36 @@ export default function AuthGate({ children }) {
       <div className="auth-kicker"><Store size={14}/> {accountType === 'customer' ? 'ग्राहक पोर्टल' : 'दुकानदार पोर्टल'}</div>
       <h1>{mode === 'login' ? 'अपने खाते में प्रवेश करें' : accountType === 'customer' ? 'ग्राहक खाता बनाएँ' : 'अपनी दुकान का खाता बनाएँ'}</h1>
       <p className="auth-desc">उधार और जमा का हिसाब सुरक्षित और साफ तरीके से संभालें।</p>
-      <form onSubmit={submit}>
-        {mode === 'signup' && <>
-          <label htmlFor="account-type">खाते का प्रकार</label>
-          <select id="account-type" value={accountType} onChange={e => setAccountType(e.target.value)} required>
-            <option value="shop_owner">दुकानदार</option>
-            <option value="customer">ग्राहक</option>
-          </select>
-          <label>आपका नाम</label><input value={name} onChange={e => setName(e.target.value)} placeholder="पूरा नाम" required/>
-          {accountType === 'shop_owner' && <><label>दुकान का नाम</label><input value={shop} onChange={e => setShop(e.target.value)} placeholder="दुकान का नाम" required/></>}
-        </>}
+      <div className="type-switch auth-method-switch">
+        <button type="button" className={authMethod === 'email' ? 'chosen' : ''} onClick={() => {setAuthMethod('email');setMessage('');}}>ईमेल</button>
+        <button type="button" className={authMethod === 'whatsapp' ? 'chosen' : ''} onClick={() => {setAuthMethod('whatsapp');setMessage('');}}>WhatsApp OTP</button>
+      </div>
+      {mode === 'signup' && <>
+        <label htmlFor="account-type">खाते का प्रकार</label>
+        <select id="account-type" value={accountType} onChange={e => setAccountType(e.target.value)} required>
+          <option value="shop_owner">दुकानदार</option>
+          <option value="customer">ग्राहक</option>
+        </select>
+        <label>आपका नाम</label><input value={name} onChange={e => setName(e.target.value)} placeholder="पूरा नाम" required/>
+        {accountType === 'shop_owner' && <><label>दुकान का नाम</label><input value={shop} onChange={e => setShop(e.target.value)} placeholder="दुकान का नाम" required/></>}
+      </>}
+      {authMethod === 'email' ? <form onSubmit={submit}>
         <label>ईमेल</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required/>
         <label>पासवर्ड</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="कम से कम 8 अक्षर" minLength="8" required/>
         {message && <div className="auth-message" role="status">{message}</div>}
         {pendingVerificationEmail && <button className="auth-switch" type="button" onClick={resendVerificationEmail} disabled={submitting || resendSeconds > 0}>{submitting ? 'ईमेल भेजा जा रहा है…' : resendSeconds > 0 ? `फिर भेजें (${resendSeconds}s बाद)` : 'पुष्टि ईमेल दोबारा भेजें'}</button>}
         <button className="primary-btn auth-submit" type="submit" disabled={submitting}>{submitting ? 'कृपया प्रतीक्षा करें…' : mode === 'login' ? 'लॉगिन करें' : 'खाता बनाएँ'} <ArrowRight size={17}/></button>
-      </form>
+      </form> : <form onSubmit={phoneOtpSent ? verifyWhatsappOtp : sendWhatsappOtp}>
+        <label>मोबाइल नंबर (देश कोड सहित)</label>
+        <input type="tel" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+97798XXXXXXXX" autoComplete="tel" required disabled={phoneOtpSent}/>
+        {phoneOtpSent && <>
+          <label>WhatsApp OTP</label>
+          <input type="text" inputMode="numeric" autoComplete="one-time-code" value={phoneOtp} onChange={e => setPhoneOtp(e.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="6 अंकों का OTP" maxLength="6" required/>
+        </>}
+        {message && <div className="auth-message" role="status">{message}</div>}
+        <button className="primary-btn auth-submit" type="submit" disabled={submitting || (phoneOtpSent && resendSeconds > 0 && !phoneOtp)}>{submitting ? 'कृपया प्रतीक्षा करें…' : phoneOtpSent ? 'OTP सत्यापित करके लॉगिन करें' : 'WhatsApp पर OTP भेजें'} <ArrowRight size={17}/></button>
+        {phoneOtpSent && <button className="auth-switch" type="button" onClick={sendWhatsappOtp} disabled={submitting || resendSeconds > 0}>{resendSeconds > 0 ? `नया OTP (${resendSeconds}s बाद)` : 'OTP दोबारा भेजें'}</button>}
+      </form>}
       <div className="auth-divider"><span>या</span></div>
       <button className="google-auth-btn" type="button" onClick={signInWithGoogle} disabled={submitting || googleSetup}>
         <span className="google-mark">G</span>{submitting ? 'कृपया प्रतीक्षा करें…' : mode === 'login' ? 'Google से लॉगिन करें' : 'Google से खाता बनाएँ'}
