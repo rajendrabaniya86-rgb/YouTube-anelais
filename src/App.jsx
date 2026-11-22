@@ -152,14 +152,99 @@ export default function App({mode='demo',user=null}){
  const reportEntries=useMemo(()=>entries.filter(x=>{const t=new Date(x.created_at).getTime();const from=reportFrom?new Date(reportFrom+'T00:00:00').getTime():-Infinity;const to=reportTo?new Date(reportTo+'T23:59:59.999').getTime():Infinity;return t>=from&&t<=to}),[entries,reportFrom,reportTo]);
  const reportTotals=useMemo(()=>summarizeLedger(reportEntries),[reportEntries]);
  function exportReport(){const rows=[['तारीख','ग्राहक','प्रकार','रकम','नोट'],...reportEntries.map(x=>[new Date(x.created_at).toLocaleString('hi-IN'),customers.find(c=>c.id===x.customer_id)?.display_name||'ग्राहक',x.entry_type==='credit'?'उधार':x.entry_type==='payment'?'जमा':'रिवर्सल',x.amount,x.note||''])];const csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='global-trust-ledger-report.csv';a.click();URL.revokeObjectURL(url);setNotice('हिसाब रिपोर्ट डाउनलोड हो गई।');setTimeout(()=>setNotice(''),3500)}
- async function saveEntry(e){e.preventDefault();const amount=Number(entryForm.amount);if(!selected?.id||!Number.isFinite(amount)||amount<=0)return setError('सही रकम लिखें।');if(!demo&&!online){if(!user?.id||!shop?.id)return setError('ऑफलाइन ड्राफ्ट के लिए लॉगिन और दुकान की जानकारी जरूरी है।');try{await saveOfflineLedgerDraft({userId:user.id,shopId:shop.id,customerId:selected.id,type:entryForm.type,amount,note:entryForm.note||''});setPendingDrafts(await listOfflineLedgerDrafts(user.id,shop.id));setNotice('लेन-देन ऑफलाइन ड्राफ्ट में सेव हुआ। इंटरनेट लौटने पर इसे सिंक करना बाकी है।');setModal('detail');setEntryForm({type:'credit',amount:'',note:''});setError('');}catch(err){setError(err.message||'ऑफलाइन ड्राफ्ट सेव नहीं हुआ।')}return;}setBusy(true);setError('');try{let row;if(demo){row={id:'de'+Date.now(),customer_id:selected.id,entry_type:entryForm.type,amount,note:entryForm.note,created_at:new Date().toISOString()};setEntries(old=>{const next=[row,...old];try{localStorage.setItem('gtn-demo-entries',JSON.stringify(next))}catch{}return next});setNotice('डेमो लेन-देन डिवाइस पर सेव हुआ।')}else{row=await addLedgerEntry(shop.id,user.id,selected.id,entryForm);setEntries(old=>[row,...old]);setNotice('लेन-देन डेटाबेस में सेव हुआ।')}setModal('detail');setEntryForm({type:'credit',amount:'',note:''});setTimeout(()=>setNotice(''),3500)}catch(e){setError(e.message||'सेव नहीं हुआ।')}finally{setBusy(false)}}
- async function saveReminder(e){e.preventDefault();if(!selected?.id)return;if(!demo&&!online)return setError('रिमाइंडर सेव करने के लिए इंटरनेट चाहिए।');setBusy(true);setError('');try{let row;if(demo){const dt=new Date(reminderForm.dueAt);if(!Number.isFinite(dt.getTime())||dt.getTime()<=Date.now())throw Error('भविष्य की तारीख और समय चुनें।');row={id:'dr'+Date.now(),customer_id:selected.id,due_at:dt.toISOString(),message:reminderForm.message,status:'pending',created_at:new Date().toISOString()};setReminders(old=>[row,...old]);}else{row=await addPaymentReminder(shop.id,user.id,selected.id,reminderForm);setReminders(old=>[row,...old]);}setModal('detail');setNotice('भुगतान रिमाइंडर सेव हो गया।');setTimeout(()=>setNotice(''),3500);}catch(e){setError(e.message||'रिमाइंडर सेव नहीं हुआ।')}finally{setBusy(false)}}
- async function finishReminder(item){try{if(!demo){await updatePaymentReminder(item.id,'completed')}setReminders(old=>old.map(x=>x.id===item.id?{...x,status:'completed',completed_at:new Date().toISOString()}:x));setNotice('रिमाइंडर पूरा चिह्नित हुआ।');}catch(e){setError(e.message||'अपडेट नहीं हुआ।')}}
- async function save(e){e.preventDefault();if(!demo&&!online)return setError('इंटरनेट वापस आने पर ही लाइव ग्राहक रिकॉर्ड सेव होगा।');if(!form.name.trim())return;setBusy(true);setError('');
- try{let row;if(demo){row={...form,id:'d'+Date.now(),display_name:form.name.trim(),created_at:new Date().toISOString()};setCustomers(old=>[row,...old]);setNotice('डेमो रिकॉर्ड इसी डिवाइस पर सेव हुआ।')}
- else{if(!shop?.id||!user?.id)throw Error('दुकान या लॉगिन जानकारी नहीं मिली।');row=await addCustomer(shop.id,user.id,form);setCustomers(old=>[row,...old]);setNotice('ग्राहक रिकॉर्ड डेटाबेस में सेव हो गया।')}
- setForm({name:'',phone:'',notes:''});setModal('');setTimeout(()=>setNotice(''),3500)
- }catch(e){setError(e.message||'सेव नहीं हुआ।')}finally{setBusy(false)}}
+ async function saveEntry(e){
+  e.preventDefault();const amount=Number(entryForm.amount);
+  if(!selected?.id||!Number.isFinite(amount)||amount<=0)return setError('सही रकम लिखें।');
+  const scopeUserId=user?.id||null,scopeShopId=shop?.id||null,customerId=selected.id;
+  const stillCurrent=()=>demo||isCurrentLiveScope(scopeUserId,scopeShopId);
+  if(!demo&&!online){
+   if(!scopeUserId||!scopeShopId)return setError('ऑफलाइन ड्राफ्ट के लिए लॉगिन और दुकान की जानकारी जरूरी है।');
+   try{
+    await saveOfflineLedgerDraft({userId:scopeUserId,shopId:scopeShopId,customerId,type:entryForm.type,amount,note:entryForm.note||''});
+    if(!stillCurrent())return;
+    const drafts=await listOfflineLedgerDrafts(scopeUserId,scopeShopId);
+    if(!stillCurrent())return;
+    setPendingDrafts(drafts);setNotice('लेन-देन ऑफलाइन ड्राफ्ट में सेव हुआ। इंटरनेट लौटने पर इसे सिंक करना बाकी है।');
+    setModal('detail');setEntryForm({type:'credit',amount:'',note:''});setError('');
+   }catch(err){if(stillCurrent())setError(err.message||'ऑफलाइन ड्राफ्ट सेव नहीं हुआ।')}
+   return;
+  }
+  setBusy(true);setError('');
+  try{
+   let row;
+   if(demo){
+    row={id:'de'+Date.now(),customer_id:customerId,entry_type:entryForm.type,amount,note:entryForm.note,created_at:new Date().toISOString()};
+    setEntries(old=>{const next=[row,...old];try{localStorage.setItem('gtn-demo-entries',JSON.stringify(next))}catch{}return next});
+    setNotice('डेमो लेन-देन डिवाइस पर सेव हुआ।');
+   }else{
+    if(!scopeUserId||!scopeShopId)throw Error('लॉगिन या दुकान की जानकारी नहीं मिली।');
+    row=await addLedgerEntry(scopeShopId,scopeUserId,customerId,entryForm);
+    if(!stillCurrent())return;
+    setEntries(old=>[row,...old]);setNotice('लेन-देन डेटाबेस में सेव हुआ।');
+   }
+   if(!stillCurrent())return;
+   setModal('detail');setEntryForm({type:'credit',amount:'',note:''});
+   setTimeout(()=>{if(stillCurrent())setNotice('')},3500);
+  }catch(e){if(stillCurrent())setError(e.message||'सेव नहीं हुआ।')}
+  finally{if(stillCurrent())setBusy(false)}
+ }
+ async function saveReminder(e){
+  e.preventDefault();if(!selected?.id)return;
+  if(!demo&&!online)return setError('रिमाइंडर सेव करने के लिए इंटरनेट चाहिए।');
+  const scopeUserId=user?.id||null,scopeShopId=shop?.id||null,customerId=selected.id;
+  const stillCurrent=()=>demo||isCurrentLiveScope(scopeUserId,scopeShopId);
+  setBusy(true);setError('');
+  try{
+   let row;
+   if(demo){
+    const dt=new Date(reminderForm.dueAt);
+    if(!Number.isFinite(dt.getTime())||dt.getTime()<=Date.now())throw Error('भविष्य की तारीख और समय चुनें।');
+    row={id:'dr'+Date.now(),customer_id:customerId,due_at:dt.toISOString(),message:reminderForm.message,status:'pending',created_at:new Date().toISOString()};
+   }else{
+    if(!scopeUserId||!scopeShopId)throw Error('लॉगिन या दुकान की जानकारी नहीं मिली।');
+    row=await addPaymentReminder(scopeShopId,scopeUserId,customerId,reminderForm);
+    if(!stillCurrent())return;
+   }
+   if(!stillCurrent())return;
+   setReminders(old=>[row,...old]);setModal('detail');setNotice('भुगतान रिमाइंडर सेव हो गया।');
+   setTimeout(()=>{if(stillCurrent())setNotice('')},3500);
+  }catch(e){if(stillCurrent())setError(e.message||'रिमाइंडर सेव नहीं हुआ।')}
+  finally{if(stillCurrent())setBusy(false)}
+ }
+ async function finishReminder(item){
+  const scopeUserId=user?.id||null,scopeShopId=shop?.id||null;
+  const stillCurrent=()=>demo||isCurrentLiveScope(scopeUserId,scopeShopId);
+  try{
+   if(!demo){
+    if(!scopeUserId||!scopeShopId)return;
+    await updatePaymentReminder(item.id,'completed');
+    if(!stillCurrent())return;
+   }
+   setReminders(old=>old.map(x=>x.id===item.id?{...x,status:'completed',completed_at:new Date().toISOString()}:x));
+   setNotice('रिमाइंडर पूरा चिह्नित हुआ।');
+  }catch(e){if(stillCurrent())setError(e.message||'अपडेट नहीं हुआ।')}
+ }
+ async function save(e){
+  e.preventDefault();if(!demo&&!online)return setError('इंटरनेट वापस आने पर ही लाइव ग्राहक रिकॉर्ड सेव होगा।');
+  if(!form.name.trim())return;
+  const scopeUserId=user?.id||null,scopeShopId=shop?.id||null;
+  const stillCurrent=()=>demo||isCurrentLiveScope(scopeUserId,scopeShopId);
+  setBusy(true);setError('');
+  try{
+   let row;
+   if(demo)row={...form,id:'d'+Date.now(),display_name:form.name.trim(),created_at:new Date().toISOString()};
+   else{
+    if(!scopeShopId||!scopeUserId)throw Error('दुकान या लॉगिन जानकारी नहीं मिली।');
+    row=await addCustomer(scopeShopId,scopeUserId,form);
+    if(!stillCurrent())return;
+   }
+   if(!stillCurrent())return;
+   setCustomers(old=>[row,...old]);setNotice(demo?'डेमो रिकॉर्ड इसी डिवाइस पर सेव हुआ।':'ग्राहक रिकॉर्ड डेटाबेस में सेव हो गया।');
+   setForm({name:'',phone:'',notes:''});setModal('');
+   setTimeout(()=>{if(stillCurrent())setNotice('')},3500);
+  }catch(e){if(stillCurrent())setError(e.message||'सेव नहीं हुआ।')}
+  finally{if(stillCurrent())setBusy(false)}
+ }
  return <div className="app-shell"><aside className="sidebar">
  <div className="brand"><div className="brand-mark"><ShieldCheck size={23}/></div><div><b>GLOBAL TRUST</b><span>NETWORK</span></div></div>
  <div className="workspace"><div className="shop-icon"><Store size={18}/></div><div><b>{shop?.shop_name||'अपनी दुकान'}</b><small>दुकानदार डैशबोर्ड</small></div></div>
