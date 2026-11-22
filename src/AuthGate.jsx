@@ -255,7 +255,11 @@ export default function AuthGate({ children }) {
   }
 
   function leavePrivateSpace() {
-    try { localStorage.removeItem('gtn-private-profile'); } catch {}
+    try {
+      const prefix = 'gtn-private-' + localGuest?.id;
+      ['customers','entries','reminders'].forEach(part => localStorage.removeItem(prefix + '-' + part));
+      localStorage.removeItem('gtn-private-profile');
+    } catch {}
     setLocalGuest(null);
     setName('');
   }
