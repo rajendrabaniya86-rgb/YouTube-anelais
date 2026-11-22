@@ -7,7 +7,7 @@ const baseDraft = () => ({
   customerId: 'customer-A', type: 'credit', amount: 125.5, note: '  synthetic offline test  ',
 });
 
-function fakeClient({ insertError = null, lookupError = null, lookupOverride = undefined } = {}) {
+function fakeClient({ insertError = null, lookupError = null, lookupOverride = undefined, transientErrorOnce = null } = {}) {
   const rows = [];
   let inserts = 0;
   return {
@@ -24,11 +24,17 @@ function fakeClient({ insertError = null, lookupError = null, lookupOverride = u
         async single() {
           inserts += 1;
           if (insertError) return { data: null, error: insertError };
+          if (transientErrorOnce && inserts === 1 && !transientErrorOnce.commitBeforeError) {
+            return { data: null, error: transientErrorOnce.error };
+          }
           if (rows.some(row => row.shop_id === payload.shop_id && row.client_ref === payload.client_ref)) {
             return { data: null, error: { code: '23505', message: 'duplicate key' } };
           }
           const row = { id: 'ledger-' + inserts, ...payload, created_at: '2026-11-22T00:00:00.000Z' };
           rows.push(row);
+          if (transientErrorOnce && inserts === 1 && transientErrorOnce.commitBeforeError) {
+            return { data: null, error: transientErrorOnce.error };
+          }
           return { data: row, error: null };
         },
         async maybeSingle() {
@@ -131,4 +137,44 @@ test('unique conflict without a matching stored row is not treated as success', 
   const client = fakeClient({ insertError: { code: '23505', message: 'duplicate key' }, lookupOverride: null });
   await assert.rejects(syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', baseDraft()),
     error => error?.code === '23505' && error?.message === 'duplicate key');
+});
+
+
+test('manual retry succeeds after a transient network failure before commit', async () => {
+  const client = fakeClient({
+    transientErrorOnce: {
+      commitBeforeError: false,
+      error: { code: '08006', message: 'synthetic temporary network outage' },
+    },
+  });
+  const draft = baseDraft();
+  await assert.rejects(
+    syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', draft),
+    error => error?.code === '08006',
+  );
+  assert.equal(client.rows.length, 0, 'failed first attempt did not create a ledger row');
+
+  const retry = await syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', draft);
+  assert.equal(retry.outcome, 'inserted');
+  assert.equal(client.rows.length, 1, 'successful retry creates exactly one ledger row');
+});
+
+test('manual retry recognizes a committed row when the first response is lost', async () => {
+  const client = fakeClient({
+    transientErrorOnce: {
+      commitBeforeError: true,
+      error: { code: '08006', message: 'synthetic response lost after commit' },
+    },
+  });
+  const draft = baseDraft();
+  await assert.rejects(
+    syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', draft),
+    error => error?.code === '08006',
+  );
+  assert.equal(client.rows.length, 1, 'server-side commit exists despite lost response');
+
+  const retry = await syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', draft);
+  assert.equal(retry.outcome, 'already_synced');
+  assert.equal(retry.row.id, client.rows[0].id);
+  assert.equal(client.rows.length, 1, 'retry does not create a duplicate ledger row');
 });
