@@ -1,4 +1,4 @@
-import {useEffect,useLayoutEffect,useMemo,useState} from 'react';
+import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Activity,Bell,BookOpen,Check,CircleHelp,Download,LayoutDashboard,Plus,Search,ShieldCheck,Store,Users,Wallet,X,Wifi,WifiOff} from 'lucide-react';
 import {addCustomer,listCustomers,addLedgerEntry,listPaymentReminders,addPaymentReminder,updatePaymentReminder,syncOfflineLedgerDraft,listPendingCustomerClaims,reviewCustomerLinkClaim,createCustomerLinkInvite} from './lib/customerService';
 import {saveOfflineLedgerDraft,listOfflineLedgerDrafts,removeOfflineLedgerDraft} from './lib/offlineQueue';
@@ -8,9 +8,11 @@ const initials=n=>(n||'?').trim().slice(0,2);
 const phoneView=p=>p?p.replace(/(\d{2})\d+(\d{2})$/,'$1••••$2'):'फोन नहीं दिया';
 export default function App({mode='demo',user=null}){
  const demo=mode!=='live';
+ const currentScopeRef=useRef({userId:user?.id||null,shopId:null,demo});
  const [customers,setCustomers]=useState(()=>{try{return JSON.parse(localStorage.getItem('gtn-demo-customers'))||sample}catch{return sample}});
  const [shop,setShop]=useState(null),[active,setActive]=useState('overview'),[query,setQuery]=useState('');
  const [loadedUserId,setLoadedUserId]=useState(null);
+ currentScopeRef.current={userId:user?.id||null,shopId:shop?.id||null,demo};
  const liveDataReady=demo||(Boolean(user?.id)&&loadedUserId===user.id&&Boolean(shop?.id));
  const [entries,setEntries]=useState(()=>{try{return JSON.parse(localStorage.getItem('gtn-demo-entries'))||[]}catch{return []}}),[entryForm,setEntryForm]=useState({type:'credit',amount:'',note:''});
  const [reminders,setReminders]=useState(()=>{try{return JSON.parse(localStorage.getItem('gtn-demo-reminders'))||[]}catch{return []}});
@@ -107,7 +109,7 @@ export default function App({mode='demo',user=null}){
   const scopeUserId=user.id,scopeShopId=shop.id;
   setSyncingDraft(true);setError('');setNotice('');
   let synced=0,failed=0;const failureMessages=[];
-  const stillSameScope=()=>user?.id===scopeUserId&&shop?.id===scopeShopId;
+  const stillSameScope=()=>!currentScopeRef.current.demo&&currentScopeRef.current.userId===scopeUserId&&currentScopeRef.current.shopId===scopeShopId;
   try{
    const drafts=await listOfflineLedgerDrafts(scopeUserId,scopeShopId);
    if(!stillSameScope())return;
