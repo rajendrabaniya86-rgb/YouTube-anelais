@@ -434,8 +434,8 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
       body: { inviteCode: concurrentInvite.data.inviteCode },
     }),
   ]);
-  const concurrentSuccesses = concurrentResults.filter((result) => !result.error && result.data?.status === 'pending').length;
-  const concurrentFailures = concurrentResults.filter((result) => Boolean(result.error)).length;
+  const concurrentSuccesses = ledgerConcurrentResults.filter((result) => !result.error && result.data?.status === 'pending').length;
+  const concurrentFailures = ledgerConcurrentResults.filter((result) => Boolean(result.error)).length;
   assert(concurrentSuccesses === 1 && concurrentFailures === 1,
     'Concurrent redemption allows exactly one successful request');
   const concurrentClaimCount = await admin.from('customer_link_claims')
