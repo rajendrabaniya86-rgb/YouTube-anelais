@@ -151,6 +151,7 @@ export default function App({mode='demo',user=null}){
  const filtered=useMemo(()=>customers.filter(c=>(c.display_name||'').toLowerCase().includes(query.toLowerCase())||(c.phone||'').includes(query)),[customers,query]);
  const reportEntries=useMemo(()=>entries.filter(x=>{const t=new Date(x.created_at).getTime();const from=reportFrom?new Date(reportFrom+'T00:00:00').getTime():-Infinity;const to=reportTo?new Date(reportTo+'T23:59:59.999').getTime():Infinity;return t>=from&&t<=to}),[entries,reportFrom,reportTo]);
  const reportTotals=useMemo(()=>summarizeLedger(reportEntries),[reportEntries]);
+ const scopedPendingDrafts=useMemo(()=>filterDraftsForScope(pendingDrafts,user?.id,shop?.id),[pendingDrafts,user?.id,shop?.id]);
  function exportReport(){const rows=[['तारीख','ग्राहक','प्रकार','रकम','नोट'],...reportEntries.map(x=>[new Date(x.created_at).toLocaleString('hi-IN'),customers.find(c=>c.id===x.customer_id)?.display_name||'ग्राहक',x.entry_type==='credit'?'उधार':x.entry_type==='payment'?'जमा':'रिवर्सल',x.amount,x.note||''])];const csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='global-trust-ledger-report.csv';a.click();URL.revokeObjectURL(url);setNotice('हिसाब रिपोर्ट डाउनलोड हो गई।');setTimeout(()=>setNotice(''),3500)}
  async function saveEntry(e){
   e.preventDefault();const amount=Number(entryForm.amount);
