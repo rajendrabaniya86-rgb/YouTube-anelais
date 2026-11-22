@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowRight, ShieldCheck, Store } from 'lucide-react';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
 import { redeemCustomerLinkInvite } from './lib/customerService';
+import { shouldApplyInitialSession } from './lib/sessionGuards';
 
 export default function AuthGate({ children }) {
   const [session, setSession] = useState(null);
@@ -32,7 +33,7 @@ export default function AuthGate({ children }) {
       if (!mounted) return;
       if (error) setMessage('लॉगिन स्थिति जाँची नहीं जा सकी। दोबारा प्रयास करें।');
       // An auth event may have delivered a newer login/logout while getSession was pending.
-      if (!authEventReceived) setSession(data?.session || null);
+      if (shouldApplyInitialSession(authEventReceived)) setSession(data?.session || null);
       setLoading(false);
     }).catch(() => {
       if (!mounted) return;
