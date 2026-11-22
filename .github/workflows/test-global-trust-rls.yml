@@ -21,6 +21,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Test offline ledger service
+        run: npm run test:offline-ledger-service
       - name: Run isolated synthetic-account RLS tests
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
