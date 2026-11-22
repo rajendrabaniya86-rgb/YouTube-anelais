@@ -16,6 +16,8 @@ export default function AuthGate({ children }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState('');
+  const [resendSeconds, setResendSeconds] = useState(0);
   const [demo, setDemo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -169,6 +171,36 @@ export default function AuthGate({ children }) {
     }
   }
 
+  useEffect(() => {
+    if (resendSeconds <= 0) return undefined;
+    const timer = window.setInterval(() => setResendSeconds((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [resendSeconds > 0]);
+
+  async function resendVerificationEmail() {
+    if (!supabase || !pendingVerificationEmail || submitting || resendSeconds > 0) return;
+    setSubmitting(true);
+    setMessage('');
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: pendingVerificationEmail,
+        options: { emailRedirectTo: Capacitor.isNativePlatform() ? appAuthRedirectTo : window.location.origin }
+      });
+      if (error) throw error;
+      setResendSeconds(60);
+      setMessage('पुष्टि ईमेल फिर से भेज दिया गया है। Inbox और Spam फ़ोल्डर देखें।');
+    } catch (error) {
+      const raw = String(error?.message || '').toLowerCase();
+      if (raw.includes('rate') || raw.includes('too many') || raw.includes('after')) {
+        setResendSeconds(60);
+        setMessage('ईमेल अभी हाल में भेजा गया है। सुरक्षा के लिए 60 सेकंड रुककर फिर प्रयास करें।');
+      } else {
+        setMessage(error?.message || 'पुष्टि ईमेल नहीं भेजा जा सका। थोड़ी देर बाद फिर प्रयास करें।');
+      }
+    } finally { setSubmitting(false); }
+  }
+
   async function signOut() {
     if (!supabase || signingOut) return;
     setSigningOut(true);
@@ -212,7 +244,9 @@ export default function AuthGate({ children }) {
           }
         });
         if (error) throw error;
-        setMessage('रजिस्ट्रेशन अनुरोध भेज दिया गया। ईमेल में पुष्टि लिंक देखें।');
+        setPendingVerificationEmail(email.trim());
+        setResendSeconds(60);
+        setMessage('रजिस्ट्रेशन अनुरोध भेज दिया गया। ईमेल में पुष्टि लिंक देखें। जरूरत हो तो 60 सेकंड बाद नीचे से दोबारा भेज सकते हैं।');
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -221,7 +255,13 @@ export default function AuthGate({ children }) {
         if (error) throw error;
       }
     } catch (error) {
-      setMessage(error?.message || 'लॉगिन सेवा से संपर्क नहीं हो पाया। इंटरनेट जाँचकर फिर कोशिश करें।');
+      const raw = String(error?.message || '').toLowerCase();
+      if (raw.includes('email not confirmed') || raw.includes('email_not_confirmed')) {
+        setPendingVerificationEmail(email.trim());
+        setMessage('इस ईमेल की पुष्टि अभी बाकी है। Inbox/Spam देखें या नीचे से पुष्टि ईमेल दोबारा भेजें।');
+      } else {
+        setMessage(error?.message || 'लॉगिन सेवा से संपर्क नहीं हो पाया। इंटरनेट जाँचकर फिर कोशिश करें।');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -264,6 +304,7 @@ export default function AuthGate({ children }) {
         <label>ईमेल</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required/>
         <label>पासवर्ड</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="कम से कम 8 अक्षर" minLength="8" required/>
         {message && <div className="auth-message" role="status">{message}</div>}
+        {pendingVerificationEmail && <button className="auth-switch" type="button" onClick={resendVerificationEmail} disabled={submitting || resendSeconds > 0}>{submitting ? 'ईमेल भेजा जा रहा है…' : resendSeconds > 0 ? `फिर भेजें (${resendSeconds}s बाद)` : 'पुष्टि ईमेल दोबारा भेजें'}</button>}
         <button className="primary-btn auth-submit" type="submit" disabled={submitting}>{submitting ? 'कृपया प्रतीक्षा करें…' : mode === 'login' ? 'लॉगिन करें' : 'खाता बनाएँ'} <ArrowRight size={17}/></button>
       </form>
       <div className="auth-divider"><span>या</span></div>
