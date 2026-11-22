@@ -455,7 +455,7 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   // make both concurrent requests fail before testing invite race behavior.
   const concurrentCustomer = await createUser('customer', '', 'concurrent-customer');
   const concurrentClient = await asUser(concurrentCustomer);
-  const ledgerConcurrentResults = await Promise.all([
+  const inviteRaceResults = await Promise.all([
     concurrentClient.functions.invoke('redeem-customer-link-invite', {
       body: { inviteCode: concurrentInvite.data.inviteCode },
     }),
@@ -463,8 +463,8 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
       body: { inviteCode: concurrentInvite.data.inviteCode },
     }),
   ]);
-  const concurrentSuccesses = ledgerConcurrentResults.filter((result) => !result.error && result.data?.status === 'pending').length;
-  const concurrentFailures = ledgerConcurrentResults.filter((result) => Boolean(result.error)).length;
+  const concurrentSuccesses = inviteRaceResults.filter((result) => !result.error && result.data?.status === 'pending').length;
+  const concurrentFailures = inviteRaceResults.filter((result) => Boolean(result.error)).length;
   assert(concurrentSuccesses === 1 && concurrentFailures === 1,
     'Concurrent redemption allows exactly one successful request');
   const concurrentClaimCount = await admin.from('customer_link_claims')
