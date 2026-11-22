@@ -33,7 +33,7 @@ export default function App({mode='demo',user=null}){
  useLayoutEffect(()=>{
   if(demo){
    try{
-    setCustomers(JSON.parse(localStorage.getItem(storageKey('customers'))||(privateMode?[]:sample));
+    setCustomers(JSON.parse(localStorage.getItem(storageKey('customers')) || 'null') || (privateMode ? [] : sample));
     setEntries(JSON.parse(localStorage.getItem(storageKey('entries')))||[]);
     setReminders(JSON.parse(localStorage.getItem(storageKey('reminders')))||[]);
    }catch{setCustomers(privateMode?[]:sample);setEntries([]);setReminders([]);}
