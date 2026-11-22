@@ -5,12 +5,35 @@ const url = process.env.SUPABASE_URL;
 const secretKey = process.env.SUPABASE_SECRET_KEY;
 const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY;
 if (!url || !secretKey || !publishableKey) {
-  throw new Error('Missing SUPABASE_URL, SUPABASE_SECRET_KEY, or SUPABASE_PUBLISHABLE_KEY repository secrets.');
+  throw new Error('Missing required Supabase CI secrets.');
 }
+
+// Fail closed before constructing clients or performing any database operation.
+// The expected ref is pinned in the workflow and must match the URL hostname.
+const expectedProjectRef = process.env.EXPECTED_SUPABASE_PROJECT_REF;
+if (expectedProjectRef !== 'wlohqkgegsknygdxufie') {
+  throw new Error('Supabase test-project allowlist is missing or invalid.');
+}
+let configuredProjectRef = '';
+try {
+  const parsedUrl = new URL(url);
+  if (parsedUrl.protocol !== 'https:') throw new Error('HTTPS required');
+  configuredProjectRef = parsedUrl.hostname.split('.')[0];
+} catch {
+  throw new Error('SUPABASE_URL is invalid; refusing to run database tests.');
+}
+if (configuredProjectRef !== expectedProjectRef) {
+  throw new Error('Supabase URL does not match the allowlisted synthetic test project; refusing all writes.');
+}
+const runId = process.env.TEST_RUN_ID || 'local';
+if (!/^[a-zA-Z0-9._-]{1,100}$/.test(runId)) {
+  throw new Error('TEST_RUN_ID contains unsupported characters.');
+}
+console.log(`Synthetic test target verified. Run ID: ${runId}`);
 
 const admin = createClient(url, secretKey, { auth: { persistSession: false, autoRefreshToken: false } });
 const publicClient = createClient(url, publishableKey, { auth: { persistSession: false, autoRefreshToken: false } });
-const tag = randomBytes(6).toString('hex');
+const tag = `${runId}-${randomBytes(4).toString('hex')}`;
 const password = `Tt-${randomBytes(24).toString('base64url')}a9!`;
 const createdUsers = [];
 const fixture = { shopIds: [], customerIds: [], ledgerIds: [], auditIds: [] };
