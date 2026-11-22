@@ -14,6 +14,7 @@ export default function AuthGate({ children }) {
   const [message, setMessage] = useState('');
   const [demo, setDemo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [accountType, setAccountType] = useState('shop_owner');
   const [inviteCode, setInviteCode] = useState('');
 
@@ -33,6 +34,24 @@ export default function AuthGate({ children }) {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
     return () => { mounted = false; listener.subscription.unsubscribe(); };
   }, []);
+
+  async function signOut() {
+    if (!supabase || signingOut) return;
+    setSigningOut(true);
+    setMessage('');
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setSession(null);
+      setDemo(false);
+      setPassword('');
+      setInviteCode('');
+    } catch (error) {
+      setMessage(error?.message || 'लॉग आउट पूरा नहीं हुआ। इंटरनेट जाँचकर फिर कोशिश करें।');
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -82,8 +101,8 @@ export default function AuthGate({ children }) {
   }
 
   if (loading) return <div className="auth-loading">सुरक्षित लॉगिन जाँचा जा रहा है…</div>;
-  if (session && session.user?.user_metadata?.account_type === 'customer') return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><span><ShieldCheck size={27}/></span><div><b>GLOBAL TRUST</b><small>NETWORK</small></div></div><div className="auth-kicker"><ShieldCheck size={14}/> ग्राहक पोर्टल</div><h1>अपना ग्राहक रिकॉर्ड जोड़ें</h1><p className="auth-desc">दुकानदार से मिला एक बार का निमंत्रण कोड यहाँ दर्ज करें। अनुरोध जमा होने पर भी दुकान का बैलेंस या लेन-देन नहीं दिखेगा। पहले दुकानदार की जाँच और सुरक्षित मंजूरी जरूरी है।</p><form onSubmit={redeemInvite}><label>निमंत्रण कोड</label><input value={inviteCode} onChange={e=>setInviteCode(e.target.value.trim())} placeholder="दुकानदार से मिला कोड" minLength="40" maxLength="50" autoComplete="off" required/><button className="primary-btn auth-submit" type="submit" disabled={submitting}>{submitting?'जाँच हो रही है…':'निमंत्रण कोड जमा करें'} <ArrowRight size={17}/></button></form>{message&&<div className="auth-message" role="status">{message}</div>}<button className="auth-switch" onClick={() => supabase.auth.signOut()}>लॉग आउट</button></section></main>
-  if (session) return <>{React.cloneElement(children, { mode: 'live', user: session.user })}<button className="signout-fab" onClick={() => supabase.auth.signOut()}>लॉग आउट</button></>;
+  if (session && session.user?.user_metadata?.account_type === 'customer') return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><span><ShieldCheck size={27}/></span><div><b>GLOBAL TRUST</b><small>NETWORK</small></div></div><div className="auth-kicker"><ShieldCheck size={14}/> ग्राहक पोर्टल</div><h1>अपना ग्राहक रिकॉर्ड जोड़ें</h1><p className="auth-desc">दुकानदार से मिला एक बार का निमंत्रण कोड यहाँ दर्ज करें। अनुरोध जमा होने पर भी दुकान का बैलेंस या लेन-देन नहीं दिखेगा। पहले दुकानदार की जाँच और सुरक्षित मंजूरी जरूरी है।</p><form onSubmit={redeemInvite}><label>निमंत्रण कोड</label><input value={inviteCode} onChange={e=>setInviteCode(e.target.value.trim())} placeholder="दुकानदार से मिला कोड" minLength="40" maxLength="50" autoComplete="off" required/><button className="primary-btn auth-submit" type="submit" disabled={submitting}>{submitting?'जाँच हो रही है…':'निमंत्रण कोड जमा करें'} <ArrowRight size={17}/></button></form>{message&&<div className="auth-message" role="status">{message}</div>}<button className="auth-switch" onClick={signOut} disabled={signingOut}>{signingOut?'लॉग आउट हो रहा है…':'लॉग आउट'}</button></section></main>
+  if (session) return <>{React.cloneElement(children, { mode: 'live', user: session.user })}<button className="signout-fab" onClick={signOut} disabled={signingOut}>{signingOut?'लॉग आउट हो रहा है…':'लॉग आउट'}</button></>;
   if (demo) return <>{React.cloneElement(children, { mode: 'demo', user: null })}<div className="demo-banner">डेमो मोड: नमूना डेटा ही दिखाया जा रहा है। <button onClick={() => setDemo(false)}>लॉगिन पर लौटें</button></div></>;
 
   return <main className="auth-screen">
