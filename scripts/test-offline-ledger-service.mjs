@@ -109,19 +109,26 @@ test('non-duplicate database errors are surfaced without retry lookup', async ()
   const client = fakeClient({ insertError: { code: '08006', message: 'synthetic network failure' } });
   await assert.rejects(
     syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', baseDraft()),
-    /synthetic network failure/,
+    error => error?.code === '08006' && error?.message === 'synthetic network failure',
   );
   assert.equal(client.inserts, 1);
 });
 
 test('retry lookup errors are surfaced instead of deleting the offline draft', async () => {
-  const client = fakeClient({ lookupError: { code: '08006', message: 'synthetic lookup failure' } });
+  const client = fakeClient({
+    insertError: { code: '23505', message: 'duplicate key' },
+    lookupError: { code: '08006', message: 'synthetic lookup failure' },
+  });
   const draft = baseDraft();
-  await assert.rejects(syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', draft), /synthetic lookup failure/);
+  await assert.rejects(
+    syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', draft),
+    error => error?.code === '08006' && error?.message === 'synthetic lookup failure',
+  );
   assert.equal(client.rows.length, 0);
 });
 
 test('unique conflict without a matching stored row is not treated as success', async () => {
   const client = fakeClient({ insertError: { code: '23505', message: 'duplicate key' }, lookupOverride: null });
-  await assert.rejects(syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', baseDraft()), /duplicate key/);
+  await assert.rejects(syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', baseDraft()),
+    error => error?.code === '23505' && error?.message === 'duplicate key');
 });
