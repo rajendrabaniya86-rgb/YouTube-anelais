@@ -264,6 +264,7 @@ export default function AuthGate({ children }) {
         phone: targetPhone,
         options: {
           channel: 'whatsapp',
+          shouldCreateUser: mode === 'signup',
           data: mode === 'signup'
             ? { full_name: name.trim(), account_type: accountType, ...(accountType === 'shop_owner' ? { shop_name: shop.trim() } : {}) }
             : undefined
