@@ -90,6 +90,62 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   const clientB = await asUser(ownerB);
   const clientCustomer = await asUser(customer);
 
+  // Customer CRUD authorization matrix. These records are dedicated synthetic
+  // fixtures so delete tests are not affected by invite/consent/ledger links.
+  const crudCreate = await clientA.from('customers').insert({
+    shop_id: shopA, display_name: `CRUD Own Customer ${tag}`,
+    phone: null, notes: 'AUTOMATED TEST FIXTURE ONLY', created_by: ownerA.id,
+  }).select('id').single();
+  if (crudCreate.error) throw new Error(`create own CRUD customer: ${crudCreate.error.message}`);
+  const crudCustomerId = crudCreate.data.id;
+  fixture.customerIds.push(crudCustomerId);
+  assert(Boolean(crudCustomerId), 'Shop A can create a customer in its own shop');
+
+  const wrongCreatorInsert = await clientA.from('customers').insert({
+    shop_id: shopA, display_name: `CRUD Wrong Creator ${tag}`,
+    notes: 'AUTOMATED TEST FIXTURE ONLY', created_by: ownerB.id,
+  }).select('id');
+  assert(Boolean(wrongCreatorInsert.error),
+    'Customer INSERT rejects a created_by value belonging to another account');
+
+  const crossShopInsert = await clientA.from('customers').insert({
+    shop_id: shopB, display_name: `CRUD Cross Shop Insert ${tag}`,
+    notes: 'AUTOMATED TEST FIXTURE ONLY', created_by: ownerA.id,
+  }).select('id');
+  assert(Boolean(crossShopInsert.error),
+    'Shop A cannot INSERT a customer into Shop B');
+
+  const ownUpdate = await clientA.from('customers')
+    .update({ display_name: `CRUD Own Customer Updated ${tag}` })
+    .eq('id', crudCustomerId).select('id').maybeSingle();
+  assert(!ownUpdate.error && ownUpdate.data?.id === crudCustomerId,
+    'Shop A can UPDATE its own customer');
+
+  const crossShopUpdate = await clientA.from('customers')
+    .update({ display_name: `UNAUTHORIZED UPDATE ${tag}` })
+    .eq('id', customerB.id).select('id');
+  assert(!crossShopUpdate.error && crossShopUpdate.data.length === 0,
+    'Shop A cannot UPDATE a Shop B customer');
+
+  const crossShopDelete = await clientA.from('customers')
+    .delete().eq('id', customerB.id).select('id');
+  assert(!crossShopDelete.error && crossShopDelete.data.length === 0,
+    'Shop A cannot DELETE a Shop B customer');
+
+  const ownDelete = await clientA.from('customers')
+    .delete().eq('id', crudCustomerId).select('id').maybeSingle();
+  assert(!ownDelete.error && ownDelete.data?.id === crudCustomerId,
+    'Shop A can DELETE its own customer when no dependent records exist');
+
+  const ledgerProtectedDelete = await clientA.from('customers')
+    .delete().eq('id', customerA.id).select('id');
+  assert(Boolean(ledgerProtectedDelete.error),
+    'Customer DELETE is blocked when ledger entries reference that customer');
+
+  const crossShopUpdateCheck = await visibleIds(clientB, 'customers', customerB.id);
+  assert(crossShopUpdateCheck.length === 1,
+    'Shop B customer remains present after Shop A cross-shop UPDATE/DELETE attempts');
+
   assert((await visibleIds(clientA, 'customers', customerA.id)).length === 1, 'Shop A can read its own customer');
   assert((await visibleIds(clientA, 'customers', customerB.id)).length === 0, 'Shop A cannot read Shop B customer');
   assert((await visibleIds(clientB, 'customers', customerB.id)).length === 1, 'Shop B can read its own customer');
