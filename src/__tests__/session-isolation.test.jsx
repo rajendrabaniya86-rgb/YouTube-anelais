@@ -128,7 +128,7 @@ describe('session and account UI isolation', () => {
       syncRequest.resolve({ row: { id: 'ledger-a', customer_id: 'customer-user-a', entry_type: 'credit', amount: 25, created_at: new Date().toISOString() } });
     });
 
-    expect(await screen.findByText('ACCOUNT_B_CUSTOMER')).toBeTruthy();
+    expect(await screen.findByText('Shop user-b')).toBeTruthy();
     expect(screen.queryByText('ACCOUNT_A_CUSTOMER')).toBeNull();
     expect(mocks.removeOfflineLedgerDraft).toHaveBeenCalledWith('draft-a', 'user-a', 'shop-user-a');
   });
