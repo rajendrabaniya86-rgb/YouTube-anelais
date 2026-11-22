@@ -33,6 +33,7 @@ export default function AuthGate({ children }) {
       authEventReceived = true;
       if (!mounted) return;
       setSession(nextSession);
+      setSubmitting(false);
       setLoading(false);
     });
     supabase.auth.getSession().then(({ data, error }) => {
