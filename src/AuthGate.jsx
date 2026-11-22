@@ -40,6 +40,7 @@ export default function AuthGate({ children }) {
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState('');
   const [resendSeconds, setResendSeconds] = useState(0);
   const [demo, setDemo] = useState(false);
+  const [localGuest, setLocalGuest] = useState(() => { try { return JSON.parse(localStorage.getItem('gtn-private-profile') || 'null'); } catch { return null; } });
   const [submitting, setSubmitting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [accountType, setAccountType] = useState('shop_owner');
@@ -238,6 +239,27 @@ export default function AuthGate({ children }) {
     } finally { setSubmitting(false); }
   }
 
+  function enterPrivateSpace(e) {
+    e.preventDefault();
+    const displayName = name.trim().slice(0, 60);
+    if (!displayName) { setMessage('अपना नाम लिखें।'); return; }
+    const guestId = `local-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`;
+    const profile = { id: guestId, name: displayName, createdAt: new Date().toISOString() };
+    try {
+      localStorage.setItem('gtn-private-profile', JSON.stringify(profile));
+      setLocalGuest(profile);
+      setMessage('');
+    } catch {
+      setMessage('इस डिवाइस में निजी प्रोफाइल सेव नहीं हो पाई। डिवाइस की स्टोरेज जाँचें।');
+    }
+  }
+
+  function leavePrivateSpace() {
+    try { localStorage.removeItem('gtn-private-profile'); } catch {}
+    setLocalGuest(null);
+    setName('');
+  }
+
   async function signOut() {
     if (!supabase || signingOut) return;
     setSigningOut(true);
@@ -391,6 +413,7 @@ export default function AuthGate({ children }) {
   if (loading || (googleSetup && session?.user)) return <div className="auth-loading">{googleSetup ? 'Google खाता सुरक्षित रूप से तैयार किया जा रहा है…' : 'सुरक्षित लॉगिन जाँचा जा रहा है…'}</div>;
   if (session && session.user?.user_metadata?.account_type === 'customer') return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><span><ShieldCheck size={27}/></span><div><b>GLOBAL TRUST</b><small>NETWORK</small></div></div><div className="auth-kicker"><ShieldCheck size={14}/> ग्राहक पोर्टल</div><h1>अपना ग्राहक रिकॉर्ड जोड़ें</h1><p className="auth-desc">दुकानदार से मिला एक बार का निमंत्रण कोड यहाँ दर्ज करें। अनुरोध जमा होने पर भी दुकान का बैलेंस या लेन-देन नहीं दिखेगा। पहले दुकानदार की जाँच और सुरक्षित मंजूरी जरूरी है।</p><form onSubmit={redeemInvite}><label>निमंत्रण कोड</label><input value={inviteCode} onChange={e=>setInviteCode(e.target.value.trim())} placeholder="दुकानदार से मिला कोड" minLength="40" maxLength="50" autoComplete="off" required/><button className="primary-btn auth-submit" type="submit" disabled={submitting}>{submitting?'जाँच हो रही है…':'निमंत्रण कोड जमा करें'} <ArrowRight size={17}/></button></form>{message&&<div className="auth-message" role="status">{message}</div>}<button className="auth-switch" onClick={signOut} disabled={signingOut}>{signingOut?'लॉग आउट हो रहा है…':'लॉग आउट'}</button></section></main>
   if (session) return <>{React.cloneElement(children, { mode: 'live', user: session.user })}<button className="signout-fab" onClick={signOut} disabled={signingOut}>{signingOut?'लॉग आउट हो रहा है…':'लॉग आउट'}</button></>;
+  if (localGuest) return <>{React.cloneElement(children, { mode: 'private', user: { id: localGuest.id, user_metadata: { full_name: localGuest.name, account_type: 'shop_owner', shop_name: 'निजी कार्यक्षेत्र' } } })}<button className="signout-fab" onClick={leavePrivateSpace}>निजी जगह बंद करें</button></>;
   if (demo) return <>{React.cloneElement(children, { mode: 'demo', user: null })}<div className="demo-banner">डेमो मोड: नमूना डेटा ही दिखाया जा रहा है। <button onClick={() => setDemo(false)}>लॉगिन पर लौटें</button></div></>;
 
   return <main className="auth-screen">
@@ -429,6 +452,15 @@ export default function AuthGate({ children }) {
         <button className="primary-btn auth-submit" type="submit" disabled={submitting || (phoneOtpSent && resendSeconds > 0 && !phoneOtp)}>{submitting ? 'कृपया प्रतीक्षा करें…' : phoneOtpSent ? 'OTP सत्यापित करके लॉगिन करें' : 'WhatsApp पर OTP भेजें'} <ArrowRight size={17}/></button>
         {phoneOtpSent && <button className="auth-switch" type="button" onClick={sendWhatsappOtp} disabled={submitting || resendSeconds > 0}>{resendSeconds > 0 ? `नया OTP (${resendSeconds}s बाद)` : 'OTP दोबारा भेजें'}</button>}
       </form>}
+      <div className="private-entry">
+        <div className="auth-divider"><span>बिना अकाउंट</span></div>
+        <form onSubmit={enterPrivateSpace}>
+          <label>सिर्फ अपना नाम लिखें</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="आपका नाम" maxLength="60" autoComplete="off" />
+          <button className="secondary-btn" type="submit">निजी तरीके से ऐप खोलें</button>
+          <p className="private-note">बिना ईमेल, OTP या अकाउंट। डेटा इसी डिवाइस पर रहेगा।</p>
+        </form>
+      </div>
       <div className="auth-divider"><span>या</span></div>
       <button className="google-auth-btn" type="button" onClick={signInWithGoogle} disabled={submitting || googleSetup}>
         <span className="google-mark">G</span>{submitting ? 'कृपया प्रतीक्षा करें…' : mode === 'login' ? 'Google से लॉगिन करें' : 'Google से खाता बनाएँ'}
