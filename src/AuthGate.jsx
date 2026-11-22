@@ -162,7 +162,45 @@ export default function AuthGate({ children }) {
     })();
   }, [session?.user?.id]);
 
-  async function signInWithGitHub() {\n    if (submitting || !supabase || !hasSupabaseConfig) {\n      if (!supabase) setMessage('GitHub लॉगिन के लिए Supabase कनेक्शन जरूरी है।');\n      return;\n    }\n    setSubmitting(true);\n    setMessage('');\n    let pendingProfile = null;\n    try {\n      if (mode === 'signup') {\n        if (!name.trim()) throw new Error('GitHub से खाता बनाने से पहले अपना नाम लिखें।');\n        if (accountType === 'shop_owner' && !shop.trim()) throw new Error('दुकान का नाम लिखें।');\n        pendingProfile = { fullName: name.trim(), accountType, shopName: accountType === 'shop_owner' ? shop.trim() : '' };\n        localStorage.setItem('gtn_google_signup_profile', JSON.stringify(pendingProfile));\n        setGoogleSetup(true);\n      }\n      const native = Capacitor.isNativePlatform();\n      const { data, error } = await supabase.auth.signInWithOAuth({\n        provider: 'github',\n        options: {\n          ...(native ? { redirectTo: appAuthRedirectTo, skipBrowserRedirect: true } : {}),\n          scopes: 'read:user user:email'\n        }\n      });\n      if (error) throw error;\n      if (native) {\n        if (!data?.url) throw new Error('GitHub लॉगिन लिंक नहीं मिला।');\n        await Browser.open({ url: data.url });\n        setSubmitting(false);\n        setGoogleSetup(false);\n      } else if (!data?.url) throw new Error('GitHub लॉगिन लिंक नहीं मिला।');\n    } catch (error) {\n      if (pendingProfile) { try { localStorage.removeItem('gtn_google_signup_profile'); } catch {} setGoogleSetup(false); }\n      setMessage(friendlyAuthError(error) || 'GitHub लॉगिन शुरू नहीं हो पाया। Supabase में GitHub Provider सेटिंग जाँचें।');\n      setSubmitting(false);\n    }\n  }\n\n  async function signInWithGoogle() {
+  async function signInWithGitHub() {
+    if (submitting || !supabase || !hasSupabaseConfig) {
+      if (!supabase) setMessage('GitHub लॉगिन के लिए Supabase कनेक्शन जरूरी है।');
+      return;
+    }
+    setSubmitting(true);
+    setMessage('');
+    let pendingProfile = null;
+    try {
+      if (mode === 'signup') {
+        if (!name.trim()) throw new Error('GitHub से खाता बनाने से पहले अपना नाम लिखें।');
+        if (accountType === 'shop_owner' && !shop.trim()) throw new Error('दुकान का नाम लिखें।');
+        pendingProfile = { fullName: name.trim(), accountType, shopName: accountType === 'shop_owner' ? shop.trim() : '' };
+        localStorage.setItem('gtn_google_signup_profile', JSON.stringify(pendingProfile));
+        setGoogleSetup(true);
+      }
+      const native = Capacitor.isNativePlatform();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'github',
+        options: {
+          ...(native ? { redirectTo: appAuthRedirectTo, skipBrowserRedirect: true } : {}),
+          scopes: 'read:user user:email'
+        }
+      });
+      if (error) throw error;
+      if (native) {
+        if (!data?.url) throw new Error('GitHub लॉगिन लिंक नहीं मिला।');
+        await Browser.open({ url: data.url });
+        setSubmitting(false);
+        setGoogleSetup(false);
+      } else if (!data?.url) throw new Error('GitHub लॉगिन लिंक नहीं मिला।');
+    } catch (error) {
+      if (pendingProfile) { try { localStorage.removeItem('gtn_google_signup_profile'); } catch {} setGoogleSetup(false); }
+      setMessage(friendlyAuthError(error) || 'GitHub लॉगिन शुरू नहीं हो पाया। Supabase में GitHub Provider सेटिंग जाँचें।');
+      setSubmitting(false);
+    }
+  }
+
+  async function signInWithGoogle() {
     if (submitting || !supabase || !hasSupabaseConfig) {
       if (!supabase) setMessage('Google लॉगिन के लिए Supabase कनेक्शन जरूरी है।');
       return;
