@@ -21,17 +21,24 @@ export default function AuthGate({ children }) {
   useEffect(() => {
     if (!supabase) return;
     let mounted = true;
+    let authEventReceived = false;
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      authEventReceived = true;
+      if (!mounted) return;
+      setSession(nextSession);
+      setLoading(false);
+    });
     supabase.auth.getSession().then(({ data, error }) => {
       if (!mounted) return;
       if (error) setMessage('लॉगिन स्थिति जाँची नहीं जा सकी। दोबारा प्रयास करें।');
-      setSession(data?.session || null);
+      // An auth event may have delivered a newer login/logout while getSession was pending.
+      if (!authEventReceived) setSession(data?.session || null);
       setLoading(false);
     }).catch(() => {
       if (!mounted) return;
       setMessage('इंटरनेट या लॉगिन सेवा में समस्या है।');
       setLoading(false);
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
     return () => { mounted = false; listener.subscription.unsubscribe(); };
   }, []);
 
@@ -46,6 +53,9 @@ export default function AuthGate({ children }) {
       setDemo(false);
       setPassword('');
       setInviteCode('');
+      setEmail('');
+      setName('');
+      setShop('');
     } catch (error) {
       setMessage(error?.message || 'लॉग आउट पूरा नहीं हुआ। इंटरनेट जाँचकर फिर कोशिश करें।');
     } finally {
