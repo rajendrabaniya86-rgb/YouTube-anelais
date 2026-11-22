@@ -253,13 +253,13 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
     ...sequentialPayload, client_ref: concurrentClientRef,
     entry_type: 'payment', amount: 30, note: 'SYNTHETIC CONCURRENT RETRY TEST',
   };
-  const concurrentResults = await Promise.all([
+  const ledgerConcurrentResults = await Promise.all([
     clientA.from('ledger_entries').insert(concurrentPayload).select('id').single(),
     clientA.from('ledger_entries').insert(concurrentPayload).select('id').single(),
   ]);
-  const concurrentSuccesses = concurrentResults.filter(result => !result.error && result.data?.id);
-  const concurrentConflicts = concurrentResults.filter(result => result.error?.code === '23505');
-  assert(concurrentSuccesses.length === 1 && concurrentConflicts.length === 1,
+  const ledgerConcurrentSuccesses = ledgerConcurrentResults.filter(result => !result.error && result.data?.id);
+  const ledgerConcurrentConflicts = ledgerConcurrentResults.filter(result => result.error?.code === '23505');
+  assert(ledgerConcurrentSuccesses.length === 1 && ledgerConcurrentConflicts.length === 1,
     'Concurrent identical client_ref requests produce one insert and one unique conflict');
   const concurrentRows = await must(admin.from('ledger_entries')
     .select('id,shop_id,customer_id,entry_type,amount,note,created_by,client_ref')
@@ -426,7 +426,7 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   // make both concurrent requests fail before testing invite race behavior.
   const concurrentCustomer = await createUser('customer', '', 'concurrent-customer');
   const concurrentClient = await asUser(concurrentCustomer);
-  const concurrentResults = await Promise.all([
+  const ledgerConcurrentResults = await Promise.all([
     concurrentClient.functions.invoke('redeem-customer-link-invite', {
       body: { inviteCode: concurrentInvite.data.inviteCode },
     }),
