@@ -61,20 +61,36 @@ export default function AuthGate({ children }) {
       try {
         try { await Browser.close(); } catch {}
         const parsed = new URL(callbackUrl);
-        const params = new URLSearchParams(parsed.hash.replace(/^#/, ''));
-        const code = parsed.searchParams.get('code');
+        const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+        const queryParams = parsed.searchParams;
+        const errorDescription = hashParams.get('error_description') || queryParams.get('error_description');
+        if (errorDescription) throw new Error(errorDescription.replace(/\\+/g, ' '));
+
+        // PKCE callback handles both OAuth sign-in and email confirmation.
+        const code = queryParams.get('code');
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
-        } else {
-          const access_token = params.get('access_token') || parsed.searchParams.get('access_token');
-          const refresh_token = params.get('refresh_token') || parsed.searchParams.get('refresh_token');
-          const errorDescription = params.get('error_description') || parsed.searchParams.get('error_description');
-          if (errorDescription) throw new Error(errorDescription.replace(/\+/g, ' '));
-          if (!access_token || !refresh_token) throw new Error('Google से सुरक्षित लॉगिन टोकन नहीं मिला।');
-          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-          if (error) throw error;
+          return;
         }
+
+        // Support Supabase confirmation links that return token_hash + type.
+        const tokenHash = queryParams.get('token_hash') || hashParams.get('token_hash');
+        const otpType = queryParams.get('type') || hashParams.get('type');
+        if (tokenHash && otpType) {
+          const allowedTypes = ['signup', 'email', 'recovery', 'invite', 'magiclink', 'email_change'];
+          if (!allowedTypes.includes(otpType)) throw new Error('ईमेल पुष्टि लिंक का प्रकार मान्य नहीं है।');
+          const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: otpType });
+          if (error) throw error;
+          return;
+        }
+
+        // Keep compatibility with existing implicit-flow callbacks.
+        const access_token = hashParams.get('access_token') || queryParams.get('access_token');
+        const refresh_token = hashParams.get('refresh_token') || queryParams.get('refresh_token');
+        if (!access_token || !refresh_token) throw new Error('लॉगिन या ईमेल पुष्टि टोकन नहीं मिला। लिंक पुराना हो सकता है।');
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (error) throw error;
       } catch (error) {
         if (active) {
           setGoogleSetup(false);
