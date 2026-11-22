@@ -26,4 +26,6 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          EXPECTED_SUPABASE_PROJECT_REF: wlohqkgegsknygdxufie
+          TEST_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: node scripts/test-rls-isolation.mjs
