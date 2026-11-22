@@ -102,7 +102,41 @@ export default function App({mode='demo',user=null}){
  }
 
 
- async function syncPendingDrafts(){if(demo||!online||!user?.id||!shop?.id||syncingDraft)return;setSyncingDraft(true);setError('');let synced=0;try{const drafts=await listOfflineLedgerDrafts(user.id,shop.id);setPendingDrafts(drafts);for(const draft of drafts){try{const result=await syncOfflineLedgerDraft(shop.id,user.id,draft);const removed=await removeOfflineLedgerDraft(draft.id,user.id,shop.id);if(!removed)throw new Error('ड्राफ्ट की दुकान/लॉगिन जाँच पूरी नहीं हुई। ड्राफ्ट सुरक्षित रखा गया है।');setPendingDrafts(old=>old.filter(x=>x.id!==draft.id));setEntries(old=>old.some(x=>x.client_ref===draft.id||x.id===result.row.id)?old:[result.row,...old]);synced++;}catch(err){setError('एक ड्राफ्ट सिंक नहीं हुआ: '+(err.message||'कारण उपलब्ध नहीं'));break;}}if(synced)setNotice(synced+' ऑफलाइन लेन-देन सर्वर से सिंक हुए।');}catch(err){setError(err.message||'ड्राफ्ट सिंक नहीं हो सके।')}finally{setSyncingDraft(false);}}
+ async function syncPendingDrafts(){
+  if(demo||!online||!user?.id||!shop?.id||syncingDraft)return;
+  const scopeUserId=user.id,scopeShopId=shop.id;
+  setSyncingDraft(true);setError('');setNotice('');
+  let synced=0,failed=0;const failureMessages=[];
+  const stillSameScope=()=>user?.id===scopeUserId&&shop?.id===scopeShopId;
+  try{
+   const drafts=await listOfflineLedgerDrafts(scopeUserId,scopeShopId);
+   if(!stillSameScope())return;
+   setPendingDrafts(drafts);
+   for(const draft of drafts){
+    try{
+     const result=await syncOfflineLedgerDraft(scopeShopId,scopeUserId,draft);
+     const removed=await removeOfflineLedgerDraft(draft.id,scopeUserId,scopeShopId);
+     if(!removed)throw new Error('ड्राफ्ट की दुकान/लॉगिन जाँच पूरी नहीं हुई। ड्राफ्ट सुरक्षित रखा गया है।');
+     if(!stillSameScope())continue;
+     setPendingDrafts(old=>old.filter(x=>x.id!==draft.id));
+     setEntries(old=>old.some(x=>x.client_ref===draft.id||x.id===result.row.id)?old:[result.row,...old]);
+     synced++;
+    }catch(err){
+     failed++;
+     failureMessages.push(err.message||'कारण उपलब्ध नहीं');
+     // Keep this draft pending and continue with the remaining independent drafts.
+    }
+   }
+   if(!stillSameScope())return;
+   if(synced)setNotice(synced+' ऑफलाइन लेन-देन सर्वर से सिंक हुए।');
+   if(failed)setError(failed+' ड्राफ्ट अभी सिंक नहीं हुए और सुरक्षित रखे गए हैं। '+failureMessages.slice(0,2).join(' | '));
+   if(!failed&&!synced)setNotice('सिंक करने के लिए कोई नया ड्राफ्ट नहीं मिला।');
+  }catch(err){
+   if(stillSameScope())setError(err.message||'ड्राफ्ट सिंक नहीं हो सके।');
+  }finally{
+   if(stillSameScope())setSyncingDraft(false);
+  }
+ }
  const filtered=useMemo(()=>customers.filter(c=>(c.display_name||'').toLowerCase().includes(query.toLowerCase())||(c.phone||'').includes(query)),[customers,query]);
  const reportEntries=useMemo(()=>entries.filter(x=>{const t=new Date(x.created_at).getTime();const from=reportFrom?new Date(reportFrom+'T00:00:00').getTime():-Infinity;const to=reportTo?new Date(reportTo+'T23:59:59.999').getTime():Infinity;return t>=from&&t<=to}),[entries,reportFrom,reportTo]);
  const reportTotals=useMemo(()=>({credit:reportEntries.filter(x=>x.entry_type==='credit').reduce((n,x)=>n+Number(x.amount),0),payment:reportEntries.filter(x=>x.entry_type==='payment').reduce((n,x)=>n+Number(x.amount),0)}),[reportEntries]);
