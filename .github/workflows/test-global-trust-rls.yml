@@ -27,6 +27,8 @@ jobs:
         run: npm run test:ledger-math
       - name: Test account isolation and auth race guards
         run: npm run test:session-guards
+      - name: Test logout and account-switch UI isolation
+        run: npm run test:ui-isolation
       - name: Run isolated synthetic-account RLS tests
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
