@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { syncOfflineLedgerDraftWithClient } from './offlineLedgerSync';
+import { syncOfflineLedgerDraftWithRetry } from './offlineLedgerSync';
 export async function listCustomers(userId) {
  if (!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
  if (!userId) throw new Error('लॉगिन उपयोगकर्ता की जानकारी नहीं मिली।');
@@ -34,7 +34,7 @@ export async function addLedgerEntry(shopId,userId,customerId,input) {
 
 // Idempotent upload for an offline draft. The draft UUID remains stable across retries.
 export async function syncOfflineLedgerDraft(shopId,userId,draft) {
- return syncOfflineLedgerDraftWithClient(supabase,shopId,userId,draft);
+ return syncOfflineLedgerDraftWithRetry(supabase,shopId,userId,draft);
 }
 
 export async function listPaymentReminders(shopId) {
