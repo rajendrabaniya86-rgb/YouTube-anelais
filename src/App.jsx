@@ -3,6 +3,7 @@ import {Activity,Bell,BookOpen,Check,CircleHelp,Download,LayoutDashboard,Plus,Se
 import {addCustomer,listCustomers,addLedgerEntry,listPaymentReminders,addPaymentReminder,updatePaymentReminder,syncOfflineLedgerDraft,listPendingCustomerClaims,reviewCustomerLinkClaim,createCustomerLinkInvite} from './lib/customerService';
 import {saveOfflineLedgerDraft,listOfflineLedgerDrafts,removeOfflineLedgerDraft} from './lib/offlineQueue';
 import {calculateLedgerBalance,summarizeLedger} from './lib/ledgerMath';
+import {isCurrentScope,filterDraftsForScope} from './lib/sessionGuards';
 const sample=[{id:'d1',display_name:'राम प्रसाद',phone:'98•••••421',notes:''},{id:'d2',display_name:'सीता देवी',phone:'98•••••815',notes:''},{id:'d3',display_name:'मोहन कुमार',phone:'97•••••203',notes:''}];
 const money=n=>'रु '+new Intl.NumberFormat('en-IN').format(n||0);
 const initials=n=>(n||'?').trim().slice(0,2);
@@ -66,10 +67,9 @@ export default function App({mode='demo',user=null}){
   })();
   return()=>{live=false};
  },[demo,user?.id]);
- useEffect(()=>{if(demo||!user?.id||!shop?.id)return;let live=true;const scopeUserId=user.id,scopeShopId=shop.id;const stillCurrent=()=>live&&isCurrentLiveScope(scopeUserId,scopeShopId);listOfflineLedgerDrafts(scopeUserId,scopeShopId).then(rows=>{if(stillCurrent())setPendingDrafts(rows.filter(d=>d.userId===scopeUserId&&d.shopId===scopeShopId))}).catch(e=>{if(stillCurrent())setError(e.message||'ऑफलाइन ड्राफ्ट नहीं पढ़े जा सके।')});return()=>{live=false}},[demo,user?.id,shop?.id]);
+ useEffect(()=>{if(demo||!user?.id||!shop?.id)return;let live=true;const scopeUserId=user.id,scopeShopId=shop.id;const stillCurrent=()=>live&&isCurrentLiveScope(scopeUserId,scopeShopId);listOfflineLedgerDrafts(scopeUserId,scopeShopId).then(rows=>{if(stillCurrent())setPendingDrafts(filterDraftsForScope(rows,scopeUserId,scopeShopId))}).catch(e=>{if(stillCurrent())setError(e.message||'ऑफलाइन ड्राफ्ट नहीं पढ़े जा सके।')});return()=>{live=false}},[demo,user?.id,shop?.id]);
  function isCurrentLiveScope(scopeUserId,scopeShopId){
-  const current=currentScopeRef.current;
-  return !current.demo&&current.userId===scopeUserId&&current.shopId===scopeShopId;
+  return isCurrentScope(currentScopeRef.current,{userId:scopeUserId,shopId:scopeShopId});
  }
  async function makeCustomerInvite(){
   if(demo||!online||!user?.id||!shop?.id||!selected?.id)return;
@@ -121,7 +121,7 @@ export default function App({mode='demo',user=null}){
   try{
    const drafts=await listOfflineLedgerDrafts(scopeUserId,scopeShopId);
    if(!stillSameScope())return;
-   setPendingDrafts(drafts);
+   setPendingDrafts(filterDraftsForScope(drafts,scopeUserId,scopeShopId));
    for(const draft of drafts){
     if(!stillSameScope())break;
     try{
