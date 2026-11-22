@@ -10,6 +10,8 @@ on:
       - 'index.html'
       - 'package.json'
       - 'capacitor.config.ts'
+      - 'scripts/configure-android-deeplink.mjs'
+      - 'supabase/functions/ensure-google-account/**'
       - '.github/workflows/android-apk.yml'
   workflow_dispatch:
 
@@ -71,6 +73,7 @@ jobs:
       - name: Generate Android project and sync fresh web build
         run: |
           npx cap add android
+          node scripts/configure-android-deeplink.mjs
           npx cap sync android
 
       - name: Build debug APK
