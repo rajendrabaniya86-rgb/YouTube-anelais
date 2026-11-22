@@ -15,9 +15,11 @@ function signedCents(entry){
 }
 export function calculateLedgerBalance(entries){
  const byId=new Map(entries.map(x=>[x.id,x]));
- let balance=0;
+ let balance=0;const reversed=new Set();
  for(const entry of entries){
   if(entry.entry_type==='reversal'){
+   if(reversed.has(entry.corrects_entry_id)) throw new Error('एक ही लेन-देन का रिवर्सल एक से अधिक बार दर्ज है।');
+   reversed.add(entry.corrects_entry_id);
    const original=byId.get(entry.corrects_entry_id);
    if(!original||original.id===entry.id||original.entry_type==='reversal') throw new Error('रिवर्सल का मूल लेन-देन नहीं मिला।');
    const originalSigned=signedCents(original);
@@ -28,12 +30,14 @@ export function calculateLedgerBalance(entries){
  return balance;
 }
 export function summarizeLedger(entries){
- let credit=0,payment=0,reversal=0;
+ let credit=0,payment=0,reversal=0;const reversed=new Set();
  const byId=new Map(entries.map(x=>[x.id,x]));
  for(const entry of entries){
   if(entry.entry_type==='credit') credit+=centsOf(entry.amount);
   else if(entry.entry_type==='payment') payment+=centsOf(entry.amount);
   else if(entry.entry_type==='reversal'){
+   if(reversed.has(entry.corrects_entry_id)) throw new Error('एक ही लेन-देन का रिवर्सल एक से अधिक बार दर्ज है।');
+   reversed.add(entry.corrects_entry_id);
    const original=byId.get(entry.corrects_entry_id);
    if(!original||original.entry_type==='reversal') throw new Error('रिवर्सल का मूल लेन-देन नहीं मिला।');
    const signed=signedCents(original);
