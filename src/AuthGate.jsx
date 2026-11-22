@@ -24,6 +24,7 @@ export default function AuthGate({ children }) {
   const [googleSetup, setGoogleSetup] = useState(() => { try { return Boolean(localStorage.getItem('gtn_google_signup_profile')); } catch { return false; } });
   const googleSetupUserRef = React.useRef(null);
   const googleRedirectTo = 'com.rajendra.globaltrustnetwork://login-callback';
+  const appAuthRedirectTo = googleRedirectTo;
 
   useEffect(() => {
     if (!supabase) return;
@@ -54,7 +55,7 @@ export default function AuthGate({ children }) {
     let active = true;
     const completeGoogleRedirect = async (event) => {
       const callbackUrl = event?.url;
-      if (!callbackUrl || !callbackUrl.startsWith(googleRedirectTo)) return;
+      if (!callbackUrl || !callbackUrl.startsWith(appAuthRedirectTo)) return;
       try {
         try { await Browser.close(); } catch {}
         const parsed = new URL(callbackUrl);
@@ -205,7 +206,10 @@ export default function AuthGate({ children }) {
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { full_name: name.trim(), account_type: accountType, ...(accountType === 'shop_owner' ? { shop_name: shop.trim() } : {}) } }
+          options: {
+            emailRedirectTo: Capacitor.isNativePlatform() ? appAuthRedirectTo : window.location.origin,
+            data: { full_name: name.trim(), account_type: accountType, ...(accountType === 'shop_owner' ? { shop_name: shop.trim() } : {}) }
+          }
         });
         if (error) throw error;
         setMessage('रजिस्ट्रेशन अनुरोध भेज दिया गया। ईमेल में पुष्टि लिंक देखें।');
