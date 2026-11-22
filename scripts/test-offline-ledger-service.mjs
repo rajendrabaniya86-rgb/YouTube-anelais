@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { syncOfflineLedgerDraftWithClient } from '../src/lib/offlineLedgerSync.js';
+import { syncOfflineLedgerDraftWithClient, syncOfflineLedgerDraftWithRetry } from '../src/lib/offlineLedgerSync.js';
 
 const baseDraft = () => ({
   id: 'draft-0001', userId: 'user-A', shopId: 'shop-A',
@@ -177,4 +177,78 @@ test('manual retry recognizes a committed row when the first response is lost', 
   assert.equal(retry.outcome, 'already_synced');
   assert.equal(retry.row.id, client.rows[0].id);
   assert.equal(client.rows.length, 1, 'retry does not create a duplicate ledger row');
+});
+
+
+test('bounded retry uses exponential backoff and succeeds after transient failures', async () => {
+  const client = fakeClient({
+    insertError: null,
+    transientErrorOnce: { commitBeforeError: false, error: { code: '08006', message: 'temporary network failure' } },
+  });
+  // Make the fake return a transient error on its first insert only.
+  const delays = [];
+  const result = await syncOfflineLedgerDraftWithRetry(client, 'shop-A', 'user-A', baseDraft(), {
+    maxAttempts: 3, baseDelayMs: 10, maxDelayMs: 100,
+    sleep: async ms => { delays.push(ms); },
+  });
+  assert.equal(result.outcome, 'inserted');
+  assert.equal(client.rows.length, 1);
+  assert.deepEqual(delays, [10]);
+});
+
+test('retry wrapper recovers when server committed but response was lost', async () => {
+  const client = fakeClient({
+    transientErrorOnce: { commitBeforeError: true, error: { code: '08006', message: 'response lost after commit' } },
+  });
+  const delays = [];
+  const result = await syncOfflineLedgerDraftWithRetry(client, 'shop-A', 'user-A', baseDraft(), {
+    baseDelayMs: 5, sleep: async ms => { delays.push(ms); },
+  });
+  assert.equal(result.outcome, 'already_synced');
+  assert.equal(client.rows.length, 1);
+  assert.deepEqual(delays, [5]);
+});
+
+test('retry wrapper stops at configured attempt limit and exposes retry state', async () => {
+  const client = fakeClient({ insertError: { code: '08006', message: 'persistent network outage' } });
+  const delays = [];
+  await assert.rejects(
+    syncOfflineLedgerDraftWithRetry(client, 'shop-A', 'user-A', baseDraft(), {
+      maxAttempts: 3, baseDelayMs: 7, maxDelayMs: 100,
+      sleep: async ms => { delays.push(ms); },
+    }),
+    error => error?.retryExhausted === true && error?.retryAttempts === 3,
+  );
+  assert.equal(client.inserts, 3);
+  assert.deepEqual(delays, [7, 14]);
+});
+
+test('authentication, permission, and validation failures are not retried', async () => {
+  for (const error of [
+    { code: '42501', message: 'permission denied' },
+    { code: 'PGRST301', message: 'JWT expired' },
+    { code: '22003', message: 'numeric value out of range' },
+  ]) {
+    const client = fakeClient({ insertError: error });
+    await assert.rejects(
+      syncOfflineLedgerDraftWithRetry(client, 'shop-A', 'user-A', baseDraft(), {
+        maxAttempts: 4, sleep: async () => { throw new Error('must not retry'); },
+      }),
+      thrown => thrown === error || thrown?.code === error.code,
+    );
+    assert.equal(client.inserts, 1);
+  }
+});
+
+test('duplicate client_ref is resolved idempotently without an extra retry delay', async () => {
+  const client = fakeClient();
+  const draft = baseDraft();
+  await syncOfflineLedgerDraftWithClient(client, 'shop-A', 'user-A', draft);
+  const delays = [];
+  const result = await syncOfflineLedgerDraftWithRetry(client, 'shop-A', 'user-A', draft, {
+    sleep: async ms => { delays.push(ms); },
+  });
+  assert.equal(result.outcome, 'already_synced');
+  assert.equal(client.rows.length, 1);
+  assert.deepEqual(delays, []);
 });
