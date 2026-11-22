@@ -86,7 +86,7 @@ describe('session and account UI isolation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'लॉग आउट' }));
     await waitFor(() => expect(screen.queryByTestId('private-child')).toBeNull());
     expect(screen.getByRole('heading', { name: 'अपने खाते में प्रवेश करें' })).toBeTruthy();
-    expect(screen.getByLabelText('ईमेल').value).toBe('');
+    expect(screen.getByPlaceholderText('you@example.com').value).toBe('');
     expect(mocks.signOut).toHaveBeenCalledTimes(1);
   });
 
