@@ -10,7 +10,8 @@
     "check:supabase": "node scripts/check-supabase-config.mjs",
     "test:offline-ledger-service": "node --test scripts/test-offline-ledger-service.mjs",
     "test:ledger-math": "node --test scripts/test-ledger-math.mjs",
-    "test:session-guards": "node --test scripts/test-session-guards.mjs"
+    "test:session-guards": "node --test scripts/test-session-guards.mjs",
+    "test:ui-isolation": "vitest run --config vitest.config.js"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -20,6 +21,10 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.5"
+    "vite": "^6.0.5",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "jsdom": "^25.0.1",
+    "vitest": "^2.1.8"
   }
 }
