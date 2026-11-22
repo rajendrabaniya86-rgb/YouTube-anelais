@@ -67,12 +67,17 @@ export default function App({mode='demo',user=null}){
   return()=>{live=false};
  },[demo,user?.id]);
  useEffect(()=>{if(demo||!user?.id||!shop?.id)return;let live=true;listOfflineLedgerDrafts(user.id,shop.id).then(rows=>live&&setPendingDrafts(rows)).catch(e=>live&&setError(e.message||'ऑफलाइन ड्राफ्ट नहीं पढ़े जा सके।'));return()=>{live=false}},[demo,user?.id,shop?.id]);
+ function isCurrentLiveScope(scopeUserId,scopeShopId){
+  const current=currentScopeRef.current;
+  return !current.demo&&current.userId===scopeUserId&&current.shopId===scopeShopId;
+ }
  async function makeCustomerInvite(){
-  if(demo||!online||!shop?.id||!selected?.id)return;
+  if(demo||!online||!user?.id||!shop?.id||!selected?.id)return;
+  const scopeUserId=user.id,scopeShopId=shop.id,customerId=selected.id;
   setBusy(true);setError('');setInviteResult(null);
-  try{const result=await createCustomerLinkInvite(shop.id,selected.id,inviteHours);setInviteResult(result);}
-  catch(e){setError(e.message||'निमंत्रण कोड नहीं बन पाया।')}
-  finally{setBusy(false);}
+  try{const result=await createCustomerLinkInvite(scopeShopId,customerId,inviteHours);if(!isCurrentLiveScope(scopeUserId,scopeShopId))return;setInviteResult(result);}
+  catch(e){if(isCurrentLiveScope(scopeUserId,scopeShopId))setError(e.message||'निमंत्रण कोड नहीं बन पाया।')}
+  finally{if(isCurrentLiveScope(scopeUserId,scopeShopId))setBusy(false);}
  }
  async function copyInviteCode(){
   if(!inviteResult?.inviteCode)return;
@@ -80,15 +85,17 @@ export default function App({mode='demo',user=null}){
   catch{setError('कॉपी नहीं हुआ। कोड को दबाकर चुनें और कॉपी करें।')}
  }
  async function refreshClaims(){
-  if(demo||!shop?.id||!online){setClaims([]);return;}
+  if(demo||!user?.id||!shop?.id||!online){setClaims([]);return;}
+  const scopeUserId=user.id,scopeShopId=shop.id;
   setClaimsLoading(true);setError('');
-  try{const rows=await listPendingCustomerClaims(shop.id);setClaims(rows);setClaimsLoaded(true);}
-  catch(e){setError(e.message||'ग्राहक लिंक अनुरोध लोड नहीं हुए।');}
-  finally{setClaimsLoading(false);}
+  try{const rows=await listPendingCustomerClaims(scopeShopId);if(!isCurrentLiveScope(scopeUserId,scopeShopId))return;setClaims(rows);setClaimsLoaded(true);}
+  catch(e){if(isCurrentLiveScope(scopeUserId,scopeShopId))setError(e.message||'ग्राहक लिंक अनुरोध लोड नहीं हुए।')}
+  finally{if(isCurrentLiveScope(scopeUserId,scopeShopId))setClaimsLoading(false);}
  }
  useEffect(()=>{if(active==='claims'&&!demo&&shop?.id&&online)refreshClaims();},[active,demo,shop?.id,online]);
  async function reviewClaim(item,decision){
-  if(demo||!online||busy)return;
+  if(demo||!online||busy||!user?.id||!shop?.id)return;
+  const scopeUserId=user.id,scopeShopId=shop.id;
   const approving=decision==='approved';
   const prompt=approving
    ? 'इस अनुरोध को मंजूर करें? यह केवल दुकानदार की प्रारंभिक रिकॉर्ड-जाँच है। इससे ग्राहक को बैलेंस या लेजर का एक्सेस नहीं मिलेगा। ग्राहक की अलग, स्पष्ट सहमति और पहचान-जाँच अभी भी जरूरी होगी।'
@@ -97,14 +104,14 @@ export default function App({mode='demo',user=null}){
   setBusy(true);setError('');
   try{
    await reviewCustomerLinkClaim(item.id,decision);
+   if(!isCurrentLiveScope(scopeUserId,scopeShopId))return;
    setClaims(old=>old.filter(row=>row.id!==item.id));
    setNotice(approving?'अनुरोध मंजूर हुआ। ग्राहक की सहमति के बिना कोई हिसाब साझा नहीं होगा।':'अनुरोध अस्वीकार हुआ।');
-   setTimeout(()=>setNotice(''),4500);
-  }catch(e){setError(e.message||'अनुरोध अपडेट नहीं हुआ।')}
-  finally{setBusy(false);}
+   setTimeout(()=>{if(isCurrentLiveScope(scopeUserId,scopeShopId))setNotice('')},4500);
+  }catch(e){if(isCurrentLiveScope(scopeUserId,scopeShopId))setError(e.message||'अनुरोध अपडेट नहीं हुआ।')}
+  finally{if(isCurrentLiveScope(scopeUserId,scopeShopId))setBusy(false);}
  }
-
-
+ 
  async function syncPendingDrafts(){
   if(demo||!online||!user?.id||!shop?.id||syncingDraft)return;
   const scopeUserId=user.id,scopeShopId=shop.id;
