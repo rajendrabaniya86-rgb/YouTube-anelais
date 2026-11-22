@@ -142,6 +142,72 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   assert(Boolean(ledgerProtectedDelete.error),
     'Customer DELETE is blocked when ledger entries reference that customer');
 
+
+  // Ledger arithmetic baseline: independent synthetic customer, exact
+  // credit/payment sequence, and raw database sum after every transaction.
+  const balanceCustomer = await must(admin.from('customers').insert({
+    shop_id: shopA, display_name: `Synthetic Balance Customer ${tag}`,
+    notes: 'AUTOMATED TEST FIXTURE ONLY', created_by: ownerA.id,
+  }).select('id').single(), 'create synthetic balance customer');
+  fixture.customerIds.push(balanceCustomer.id);
+  const balanceSteps = [
+    { type: 'credit', amount: 1000, expected: 1000 },
+    { type: 'payment', amount: 400, expected: 600 },
+    { type: 'credit', amount: 500, expected: 1100 },
+    { type: 'payment', amount: 1100, expected: 0 },
+  ];
+  let balanceEntryToProtect = null;
+  for (const [index, step] of balanceSteps.entries()) {
+    const inserted = await must(clientA.from('ledger_entries').insert({
+      shop_id: shopA, customer_id: balanceCustomer.id,
+      entry_type: step.type, amount: step.amount,
+      note: 'AUTOMATED TEST FIXTURE ONLY', created_by: ownerA.id,
+    }).select('id').single(), `insert balance step ${index + 1}`);
+    fixture.ledgerIds.push(inserted.id);
+    if (index === 0) balanceEntryToProtect = inserted.id;
+
+    const rawRows = await must(admin.from('ledger_entries')
+      .select('entry_type, amount')
+      .eq('shop_id', shopA).eq('customer_id', balanceCustomer.id),
+      `read raw ledger after step ${index + 1}`);
+    const rawBalance = rawRows.reduce((sum, row) => {
+      const amount = Number(row.amount);
+      return sum + (row.entry_type === 'payment' ? -amount : amount);
+    }, 0);
+    assert(Math.abs(rawBalance - step.expected) < 0.000001,
+      `Raw ledger balance after step ${index + 1} equals ${step.expected}`);
+  }
+  const finalBalanceRows = await must(admin.from('ledger_entries')
+    .select('entry_type, amount')
+    .eq('shop_id', shopA).eq('customer_id', balanceCustomer.id),
+    'read final synthetic balance ledger');
+  const finalRawBalance = finalBalanceRows.reduce((sum, row) => {
+    const amount = Number(row.amount);
+    return sum + (row.entry_type === 'payment' ? -amount : amount);
+  }, 0);
+  assert(finalRawBalance === 0,
+    'Credit/payment sequence 0 → +1000 → +600 → +1100 → 0 finishes at zero');
+
+  // Authenticated ledger rows are append-only: UPDATE/DELETE should affect
+  // zero rows, and the original entry must remain unchanged.
+  const attemptedLedgerUpdate = await clientA.from('ledger_entries')
+    .update({ amount: 9999, note: 'UNAUTHORIZED MUTATION' })
+    .eq('id', balanceEntryToProtect).select('id');
+  assert(!attemptedLedgerUpdate.error && attemptedLedgerUpdate.data.length === 0,
+    'Authenticated owner cannot UPDATE an existing ledger entry');
+
+  const attemptedLedgerDelete = await clientA.from('ledger_entries')
+    .delete().eq('id', balanceEntryToProtect).select('id');
+  assert(!attemptedLedgerDelete.error && attemptedLedgerDelete.data.length === 0,
+    'Authenticated owner cannot DELETE an existing ledger entry');
+
+  const protectedLedgerRow = await must(admin.from('ledger_entries')
+    .select('amount, note').eq('id', balanceEntryToProtect).single(),
+    'verify protected ledger entry remains unchanged');
+  assert(Number(protectedLedgerRow.amount) === 1000 &&
+    protectedLedgerRow.note === 'AUTOMATED TEST FIXTURE ONLY',
+    'Ledger entry values remain unchanged after UPDATE/DELETE attempts');
+
   const crossShopUpdateCheck = await visibleIds(clientB, 'customers', customerB.id);
   assert(crossShopUpdateCheck.length === 1,
     'Shop B customer remains present after Shop A cross-shop UPDATE/DELETE attempts');
