@@ -100,3 +100,8 @@ Do not use `--include-all` to force migrations into a project with unknown histo
 - [ ] No request path grants ledger access merely because a claim is pending.
 
 A static CI pass is not a live Supabase security test. Do not describe the system as production-secure until these checks have been run against the actual test project and reviewed.
+
+
+## Custom SMTP email delivery
+
+See [docs/CUSTOM-SMTP-SETUP.md](CUSTOM-SMTP-SETUP.md) for the provider prerequisites, secure Supabase configuration, and end-to-end email verification checklist. Custom SMTP is not active until a verified sender domain and provider credentials have been configured by the authorized project owner. Keep email confirmation enabled.
