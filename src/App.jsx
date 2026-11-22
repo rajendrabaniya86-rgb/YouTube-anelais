@@ -11,13 +11,13 @@ const phoneView=p=>p?p.replace(/(\d{2})\d+(\d{2})$/,'$1••••$2'):'फो�
 export default function App({mode='demo',user=null}){
  const demo=mode!=='live';
  const currentScopeRef=useRef({userId:user?.id||null,shopId:null,demo});
- const [customers,setCustomers]=useState(()=>{try{return JSON.parse(localStorage.getItem('gtn-demo-customers'))||sample}catch{return sample}});
+ const [customers,setCustomers]=useState(()=>{if(!demo)return [];try{return JSON.parse(localStorage.getItem('gtn-demo-customers'))||sample}catch{return sample}});
  const [shop,setShop]=useState(null),[active,setActive]=useState('overview'),[query,setQuery]=useState('');
  const [loadedUserId,setLoadedUserId]=useState(null);
  currentScopeRef.current={userId:user?.id||null,shopId:shop?.id||null,demo};
  const liveDataReady=demo||(Boolean(user?.id)&&loadedUserId===user.id&&Boolean(shop?.id));
- const [entries,setEntries]=useState(()=>{try{return JSON.parse(localStorage.getItem('gtn-demo-entries'))||[]}catch{return []}}),[entryForm,setEntryForm]=useState({type:'credit',amount:'',note:''});
- const [reminders,setReminders]=useState(()=>{try{return JSON.parse(localStorage.getItem('gtn-demo-reminders'))||[]}catch{return []}});
+ const [entries,setEntries]=useState(()=>{if(!demo)return [];try{return JSON.parse(localStorage.getItem('gtn-demo-entries'))||[]}catch{return []}}),[entryForm,setEntryForm]=useState({type:'credit',amount:'',note:''});
+ const [reminders,setReminders]=useState(()=>{if(!demo)return [];try{return JSON.parse(localStorage.getItem('gtn-demo-reminders'))||[]}catch{return []}});
  const [reminderForm,setReminderForm]=useState({dueAt:'',message:'भुगतान की याद दिलाने के लिए संपर्क करें।'});
  const [reportFrom,setReportFrom]=useState('');const [reportTo,setReportTo]=useState('');
  const [modal,setModal]=useState(''),[selected,setSelected]=useState(null),[form,setForm]=useState({name:'',phone:'',notes:''});
@@ -36,12 +36,14 @@ export default function App({mode='demo',user=null}){
    }catch{setCustomers(sample);setEntries([]);setReminders([]);}
    setLoadedUserId(null);setShop(null);setPendingDrafts([]);setClaims([]);
    setSelected(null);setModal('');setInviteResult(null);setError('');setNotice('');
+   setForm({name:'',phone:'',notes:''});setEntryForm({type:'credit',amount:'',note:''});setReminderForm({dueAt:'',message:'भुगतान की याद दिलाने के लिए संपर्क करें।'});setReportFrom('');setReportTo('');setActive('overview');setBusy(false);setSyncingDraft(false);
    return;
   }
   setLoadedUserId(null);
   setShop(null);setCustomers([]);setEntries([]);setReminders([]);setPendingDrafts([]);
   setClaims([]);setClaimsLoaded(false);setClaimsLoading(false);
   setSelected(null);setModal('');setInviteResult(null);setQuery('');
+  setForm({name:'',phone:'',notes:''});setEntryForm({type:'credit',amount:'',note:''});setReminderForm({dueAt:'',message:'भुगतान की याद दिलाने के लिए संपर्क करें।'});setReportFrom('');setReportTo('');setActive('overview');setSyncingDraft(false);
   setError('');setNotice('');setBusy(false);
  },[demo,user?.id]);
  useEffect(()=>{
