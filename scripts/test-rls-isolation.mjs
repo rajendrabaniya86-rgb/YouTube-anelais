@@ -127,6 +127,35 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   assert(!crossShopUpdate.error && crossShopUpdate.data.length === 0,
     'Shop A cannot UPDATE a Shop B customer');
 
+  // Ledger tenant boundary: a valid Shop A session must not write against
+  // Shop B's shop_id or customer_id, even when the request is otherwise valid.
+  const crossShopLedgerInsert = await clientA.from('ledger_entries').insert({
+    shop_id: shopB, customer_id: customerB.id, entry_type: 'credit', amount: 1,
+    note: 'AUTOMATED TEST FIXTURE ONLY', created_by: ownerA.id,
+  }).select('id');
+  assert(Boolean(crossShopLedgerInsert.error),
+    'Shop A cannot INSERT a ledger entry into Shop B');
+
+  const crossCustomerLedgerInsert = await clientA.from('ledger_entries').insert({
+    shop_id: shopA, customer_id: customerB.id, entry_type: 'credit', amount: 1,
+    note: 'AUTOMATED TEST FIXTURE ONLY', created_by: ownerA.id,
+  }).select('id');
+  assert(Boolean(crossCustomerLedgerInsert.error),
+    'Shop A cannot INSERT a ledger entry against a Shop B customer');
+
+  const crossShopLedgerUpdate = await clientA.from('ledger_entries')
+    .update({ amount: 999, note: 'UNAUTHORIZED TEST MUTATION' })
+    .eq('id', ledgerB.id).select('id');
+  assert(Boolean(crossShopLedgerUpdate.error) ||
+    (Array.isArray(crossShopLedgerUpdate.data) && crossShopLedgerUpdate.data.length === 0),
+    'Shop A cannot UPDATE a Shop B ledger entry');
+
+  const crossShopLedgerDelete = await clientA.from('ledger_entries')
+    .delete().eq('id', ledgerB.id).select('id');
+  assert(Boolean(crossShopLedgerDelete.error) ||
+    (Array.isArray(crossShopLedgerDelete.data) && crossShopLedgerDelete.data.length === 0),
+    'Shop A cannot DELETE a Shop B ledger entry');
+
   const crossShopDelete = await clientA.from('customers')
     .delete().eq('id', customerB.id).select('id');
   assert(!crossShopDelete.error && crossShopDelete.data.length === 0,
