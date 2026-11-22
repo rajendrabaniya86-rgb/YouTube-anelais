@@ -193,13 +193,19 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   const attemptedLedgerUpdate = await clientA.from('ledger_entries')
     .update({ amount: 9999, note: 'UNAUTHORIZED MUTATION' })
     .eq('id', balanceEntryToProtect).select('id');
-  assert(!attemptedLedgerUpdate.error && attemptedLedgerUpdate.data.length === 0,
-    'Authenticated owner cannot UPDATE an existing ledger entry');
+  assert(
+    Boolean(attemptedLedgerUpdate.error) ||
+      (Array.isArray(attemptedLedgerUpdate.data) && attemptedLedgerUpdate.data.length === 0),
+    'Authenticated owner cannot UPDATE an existing ledger entry (denied or zero rows)',
+  );
 
   const attemptedLedgerDelete = await clientA.from('ledger_entries')
     .delete().eq('id', balanceEntryToProtect).select('id');
-  assert(!attemptedLedgerDelete.error && attemptedLedgerDelete.data.length === 0,
-    'Authenticated owner cannot DELETE an existing ledger entry');
+  assert(
+    Boolean(attemptedLedgerDelete.error) ||
+      (Array.isArray(attemptedLedgerDelete.data) && attemptedLedgerDelete.data.length === 0),
+    'Authenticated owner cannot DELETE an existing ledger entry (denied or zero rows)',
+  );
 
   const protectedLedgerRow = await must(admin.from('ledger_entries')
     .select('amount, note').eq('id', balanceEntryToProtect).single(),
