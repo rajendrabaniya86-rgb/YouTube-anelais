@@ -121,9 +121,10 @@ export default function App({mode='demo',user=null}){
   let synced=0,failed=0;const failureMessages=[];
   const stillSameScope=()=>!currentScopeRef.current.demo&&currentScopeRef.current.userId===scopeUserId&&currentScopeRef.current.shopId===scopeShopId;
   try{
-   const drafts=await listOfflineLedgerDrafts(scopeUserId,scopeShopId);
+   const storedDrafts=await listOfflineLedgerDrafts(scopeUserId,scopeShopId);
    if(!stillSameScope())return;
-   setPendingDrafts(filterDraftsForScope(drafts,scopeUserId,scopeShopId));
+   const drafts=filterDraftsForScope(storedDrafts,scopeUserId,scopeShopId);
+   setPendingDrafts(drafts);
    for(const draft of drafts){
     if(!stillSameScope())break;
     try{
