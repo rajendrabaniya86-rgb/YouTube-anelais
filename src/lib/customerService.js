@@ -14,7 +14,7 @@ export async function listCustomers(userId) {
  const shop=shops[0];
  const {data,error}=await supabase.from('customers').select('id,shop_id,display_name,phone,notes,created_at').eq('shop_id',shop.id).order('created_at',{ascending:false});
  if(error) throw error;
- const {data:entries,error:ledgerError}=await supabase.from('ledger_entries').select('id,shop_id,customer_id,entry_type,amount,note,created_at').eq('shop_id',shop.id).order('created_at',{ascending:false});
+ const {data:entries,error:ledgerError}=await supabase.from('ledger_entries').select('id,shop_id,customer_id,entry_type,amount,note,created_at,corrects_entry_id').eq('shop_id',shop.id).order('created_at',{ascending:false});
  if(ledgerError) throw ledgerError; return {shop,customers:data||[],entries:entries||[]};
 }
 export async function addCustomer(shopId,userId,input) {
@@ -22,7 +22,7 @@ export async function addCustomer(shopId,userId,input) {
  if(error) throw error; return data;
 }
 export async function listLedgerEntries(shopId) {
- const {data,error}=await supabase.from('ledger_entries').select('id,shop_id,customer_id,entry_type,amount,note,created_at').eq('shop_id',shopId).order('created_at',{ascending:false});
+ const {data,error}=await supabase.from('ledger_entries').select('id,shop_id,customer_id,entry_type,amount,note,created_at,corrects_entry_id').eq('shop_id',shopId).order('created_at',{ascending:false});
  if(error) throw error; return data||[];
 }
 export async function addLedgerEntry(shopId,userId,customerId,input) {
