@@ -7,7 +7,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "check:supabase": "node scripts/check-supabase-config.mjs"
+    "check:supabase": "node scripts/check-supabase-config.mjs",
+    "test:offline-ledger-service": "node --test scripts/test-offline-ledger-service.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
