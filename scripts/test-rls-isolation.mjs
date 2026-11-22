@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 const url = process.env.SUPABASE_URL;
 const secretKey = process.env.SUPABASE_SECRET_KEY;
@@ -213,6 +213,79 @@ const ownerA = await createUser('shop_owner', `Synthetic Shop A ${tag}`, 'shop-o
   assert(Number(protectedLedgerRow.amount) === 1000 &&
     protectedLedgerRow.note === 'AUTOMATED TEST FIXTURE ONLY',
     'Ledger entry values remain unchanged after UPDATE/DELETE attempts');
+
+
+  // Offline ledger idempotency: sequential duplicate, concurrent race, and
+  // retry lookup are tested with independent synthetic customer records.
+  const sequentialClientRef = randomUUID();
+  const sequentialPayload = {
+    shop_id: shopA, customer_id: balanceCustomer.id, created_by: ownerA.id,
+    entry_type: 'credit', amount: 125, note: 'SYNTHETIC IDEMPOTENCY TEST',
+    client_ref: sequentialClientRef,
+  };
+  const firstSequential = await must(clientA.from('ledger_entries')
+    .insert(sequentialPayload).select('id,shop_id,customer_id,entry_type,amount,note,created_by,client_ref').single(),
+    'insert first sequential client_ref ledger row');
+  fixture.ledgerIds.push(firstSequential.id);
+  const duplicateSequential = await clientA.from('ledger_entries')
+    .insert(sequentialPayload).select('id');
+  assert(duplicateSequential.error?.code === '23505',
+    'Sequential duplicate client_ref is rejected by the unique index');
+  const sequentialExisting = await must(clientA.from('ledger_entries')
+    .select('id,shop_id,customer_id,entry_type,amount,note,created_by,client_ref')
+    .eq('shop_id', shopA).eq('client_ref', sequentialClientRef).maybeSingle(),
+    'lookup existing sequential client_ref row');
+  assert(sequentialExisting?.id === firstSequential.id &&
+    sequentialExisting.customer_id === sequentialPayload.customer_id &&
+    sequentialExisting.created_by === ownerA.id &&
+    sequentialExisting.entry_type === sequentialPayload.entry_type &&
+    Number(sequentialExisting.amount) === sequentialPayload.amount &&
+    sequentialExisting.note === sequentialPayload.note,
+    'Sequential retry lookup returns the original matching ledger row');
+  const sequentialCountRows = await must(admin.from('ledger_entries')
+    .select('id').eq('shop_id', shopA).eq('client_ref', sequentialClientRef),
+    'count sequential client_ref rows');
+  assert(sequentialCountRows.length === 1,
+    'Sequential duplicate client_ref leaves exactly one ledger row');
+
+  const concurrentClientRef = randomUUID();
+  const concurrentPayload = {
+    ...sequentialPayload, client_ref: concurrentClientRef,
+    entry_type: 'payment', amount: 30, note: 'SYNTHETIC CONCURRENT RETRY TEST',
+  };
+  const concurrentResults = await Promise.all([
+    clientA.from('ledger_entries').insert(concurrentPayload).select('id').single(),
+    clientA.from('ledger_entries').insert(concurrentPayload).select('id').single(),
+  ]);
+  const concurrentSuccesses = concurrentResults.filter(result => !result.error && result.data?.id);
+  const concurrentConflicts = concurrentResults.filter(result => result.error?.code === '23505');
+  assert(concurrentSuccesses.length === 1 && concurrentConflicts.length === 1,
+    'Concurrent identical client_ref requests produce one insert and one unique conflict');
+  const concurrentRows = await must(admin.from('ledger_entries')
+    .select('id,shop_id,customer_id,entry_type,amount,note,created_by,client_ref')
+    .eq('shop_id', shopA).eq('client_ref', concurrentClientRef),
+    'read concurrent client_ref rows');
+  if (concurrentRows[0]?.id) fixture.ledgerIds.push(concurrentRows[0].id);
+  assert(concurrentRows.length === 1,
+    'Concurrent identical client_ref requests leave exactly one ledger row');
+  const concurrentRetry = concurrentRows[0];
+  assert(Boolean(concurrentRetry) &&
+    concurrentRetry.customer_id === concurrentPayload.customer_id &&
+    concurrentRetry.created_by === ownerA.id &&
+    concurrentRetry.entry_type === concurrentPayload.entry_type &&
+    Number(concurrentRetry.amount) === concurrentPayload.amount &&
+    concurrentRetry.note === concurrentPayload.note,
+    'Concurrent retry can retrieve the original matching ledger row');
+  const idempotentBalanceRows = await must(admin.from('ledger_entries')
+    .select('entry_type,amount').eq('shop_id', shopA)
+    .eq('customer_id', balanceCustomer.id),
+    'read balance after idempotency tests');
+  const idempotentBalance = idempotentBalanceRows.reduce((sum, row) => {
+    const amount = Number(row.amount);
+    return sum + (row.entry_type === 'payment' ? -amount : amount);
+  }, 0);
+  assert(idempotentBalance === 95,
+    'Duplicate retries affect the synthetic customer balance only once per client_ref');
 
   const crossShopUpdateCheck = await visibleIds(clientB, 'customers', customerB.id);
   assert(crossShopUpdateCheck.length === 1,
