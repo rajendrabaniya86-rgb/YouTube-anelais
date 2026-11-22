@@ -30,3 +30,8 @@ test('unsupported transaction type and invalid decimal values are rejected',()=>
  assert.throws(()=>centsOf('1.239'),/दो दशमलव/);
  assert.throws(()=>calculateLedgerBalance([row('x','refund','10.00')]),/लेन-देन प्रकार/);
 });
+
+test('duplicate reversal references are rejected to prevent double adjustment',()=>{
+ const rows=[row('c1','credit','50.00'),row('r1','reversal','50.00',{corrects_entry_id:'c1'}),row('r2','reversal','50.00',{corrects_entry_id:'c1'})];
+ assert.throws(()=>calculateLedgerBalance(rows),/एक ही लेन-देन/);
+});
