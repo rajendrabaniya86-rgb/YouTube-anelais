@@ -18,6 +18,7 @@ const requiredMigrations = [
   '014_customer_consent_write_lockdown.sql',
   '015_same_customer_ledger_references.sql',
   '016_shop_owner_customer_claim_review.sql',
+  '017_explicit_deny_customer_link_tables.sql',
 ];
 const requiredFunctions = [
   'create-customer-link-invite',
