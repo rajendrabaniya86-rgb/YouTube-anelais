@@ -10,14 +10,17 @@ const initials=n=>(n||'?').trim().slice(0,2);
 const phoneView=p=>p?p.replace(/(\d{2})\d+(\d{2})$/,'$1••••$2'):'फोन नहीं दिया';
 export default function App({mode='demo',user=null}){
  const demo=mode!=='live';
+ const privateMode=mode==='private';
+ const storagePrefix=privateMode ? 'gtn-private-'+(user?.id||'unknown') : 'gtn-demo';
+ const storageKey=(part)=>storagePrefix+'-'+part;
  const currentScopeRef=useRef({userId:user?.id||null,shopId:null,demo});
- const [customers,setCustomers]=useState(()=>{if(!demo)return [];try{return JSON.parse(localStorage.getItem('gtn-demo-customers'))||sample}catch{return sample}});
+ const [customers,setCustomers]=useState(()=>{if(!demo)return [];try{return JSON.parse(localStorage.getItem(storageKey('customers')))||(privateMode?[]:sample)}catch{return privateMode?[]:sample}});
  const [shop,setShop]=useState(null),[active,setActive]=useState('overview'),[query,setQuery]=useState('');
  const [loadedUserId,setLoadedUserId]=useState(null);
  currentScopeRef.current={userId:user?.id||null,shopId:shop?.id||null,demo};
  const liveDataReady=demo||(Boolean(user?.id)&&loadedUserId===user.id&&Boolean(shop?.id));
- const [entries,setEntries]=useState(()=>{if(!demo)return [];try{return JSON.parse(localStorage.getItem('gtn-demo-entries'))||[]}catch{return []}}),[entryForm,setEntryForm]=useState({type:'credit',amount:'',note:''});
- const [reminders,setReminders]=useState(()=>{if(!demo)return [];try{return JSON.parse(localStorage.getItem('gtn-demo-reminders'))||[]}catch{return []}});
+ const [entries,setEntries]=useState(()=>{if(!demo)return [];try{return JSON.parse(localStorage.getItem(storageKey('entries')))||[]}catch{return []}}),[entryForm,setEntryForm]=useState({type:'credit',amount:'',note:''});
+ const [reminders,setReminders]=useState(()=>{if(!demo)return [];try{return JSON.parse(localStorage.getItem(storageKey('reminders')))||[]}catch{return []}});
  const [reminderForm,setReminderForm]=useState({dueAt:'',message:'भुगतान की याद दिलाने के लिए संपर्क करें।'});
  const [reportFrom,setReportFrom]=useState('');const [reportTo,setReportTo]=useState('');
  const [modal,setModal]=useState(''),[selected,setSelected]=useState(null),[form,setForm]=useState({name:'',phone:'',notes:''});
@@ -26,14 +29,14 @@ export default function App({mode='demo',user=null}){
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [online,setOnline]=useState(()=>typeof navigator==='undefined'?true:navigator.onLine);const [pendingDrafts,setPendingDrafts]=useState([]);const [syncingDraft,setSyncingDraft]=useState(false);
  useEffect(()=>{const up=()=>setOnline(true),down=()=>setOnline(false);window.addEventListener('online',up);window.addEventListener('offline',down);return()=>{window.removeEventListener('online',up);window.removeEventListener('offline',down)}},[]);
- useEffect(()=>{if(demo){try{localStorage.setItem('gtn-demo-customers',JSON.stringify(customers));localStorage.setItem('gtn-demo-entries',JSON.stringify(entries));localStorage.setItem('gtn-demo-reminders',JSON.stringify(reminders))}catch{};}},[demo,customers,entries,reminders]);
+ useEffect(()=>{if(demo){try{localStorage.setItem(storageKey('customers'),JSON.stringify(customers));localStorage.setItem(storageKey('entries'),JSON.stringify(entries));localStorage.setItem(storageKey('reminders'),JSON.stringify(reminders))}catch{};}},[demo,storagePrefix,customers,entries,reminders]);
  useLayoutEffect(()=>{
   if(demo){
    try{
-    setCustomers(JSON.parse(localStorage.getItem('gtn-demo-customers'))||sample);
-    setEntries(JSON.parse(localStorage.getItem('gtn-demo-entries'))||[]);
-    setReminders(JSON.parse(localStorage.getItem('gtn-demo-reminders'))||[]);
-   }catch{setCustomers(sample);setEntries([]);setReminders([]);}
+    setCustomers(JSON.parse(localStorage.getItem(storageKey('customers'))||(privateMode?[]:sample));
+    setEntries(JSON.parse(localStorage.getItem(storageKey('entries')))||[]);
+    setReminders(JSON.parse(localStorage.getItem(storageKey('reminders')))||[]);
+   }catch{setCustomers(privateMode?[]:sample);setEntries([]);setReminders([]);}
    setLoadedUserId(null);setShop(null);setPendingDrafts([]);setClaims([]);
    setSelected(null);setModal('');setInviteResult(null);setError('');setNotice('');
    setForm({name:'',phone:'',notes:''});setEntryForm({type:'credit',amount:'',note:''});setReminderForm({dueAt:'',message:'भुगतान की याद दिलाने के लिए संपर्क करें।'});setReportFrom('');setReportTo('');setActive('overview');setBusy(false);setSyncingDraft(false);
@@ -45,7 +48,7 @@ export default function App({mode='demo',user=null}){
   setSelected(null);setModal('');setInviteResult(null);setQuery('');
   setForm({name:'',phone:'',notes:''});setEntryForm({type:'credit',amount:'',note:''});setReminderForm({dueAt:'',message:'भुगतान की याद दिलाने के लिए संपर्क करें।'});setReportFrom('');setReportTo('');setActive('overview');setSyncingDraft(false);
   setError('');setNotice('');setBusy(false);
- },[demo,user?.id]);
+ },[demo,storagePrefix,user?.id]);
  useEffect(()=>{
   if(demo||!user?.id)return;
   let live=true;
@@ -178,7 +181,7 @@ export default function App({mode='demo',user=null}){
    let row;
    if(demo){
     row={id:'de'+Date.now(),customer_id:customerId,entry_type:entryForm.type,amount,note:entryForm.note,created_at:new Date().toISOString()};
-    setEntries(old=>{const next=[row,...old];try{localStorage.setItem('gtn-demo-entries',JSON.stringify(next))}catch{}return next});
+    setEntries(old=>{const next=[row,...old];try{localStorage.setItem(storageKey('entries'),JSON.stringify(next))}catch{}return next});
     setNotice('डेमो लेन-देन डिवाइस पर सेव हुआ।');
    }else{
     if(!scopeUserId||!scopeShopId)throw Error('लॉगिन या दुकान की जानकारी नहीं मिली।');
