@@ -1,5 +1,5 @@
 import React, {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import {Activity,Bell,BellRing,BookOpen,Check,CircleHelp,Download,LayoutDashboard,Monitor, Moon,Palette,Plus,RotateCcw,Search,Settings,ShieldCheck,Store,Sun,Users,Vibrate,Volume2,Wallet,X,Wifi,WifiOff} from 'lucide-react';
+import {Activity,Bell,BellRing,BookOpen,Check,CircleHelp,Download,Globe,LayoutDashboard,Monitor, Moon,Palette,Plus,RotateCcw,Search,Settings,ShieldCheck,Store,Sun,Users,Vibrate,Volume2,Wallet,X,Wifi,WifiOff} from 'lucide-react';
 import {addCustomer,listCustomers,addLedgerEntry,listPaymentReminders,addPaymentReminder,updatePaymentReminder,syncOfflineLedgerDraft,listPendingCustomerClaims,reviewCustomerLinkClaim,createCustomerLinkInvite} from './lib/customerService';
 import {saveOfflineLedgerDraft,listOfflineLedgerDrafts,removeOfflineLedgerDraft} from './lib/offlineQueue';
 import {calculateLedgerBalance,summarizeLedger} from './lib/ledgerMath';
