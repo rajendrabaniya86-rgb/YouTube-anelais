@@ -73,3 +73,55 @@ html,body,#root{width:100%;min-height:100%;overflow-x:hidden}
  .toast{left:12px;right:12px;bottom:calc(72px + env(safe-area-inset-bottom));justify-content:center}
  .signout-fab{bottom:calc(72px + env(safe-area-inset-bottom))}
 }
+
+
+/* Final device-fit rules: prevent the desktop sidebar from squeezing phone layouts. */
+img,svg,video,canvas{max-width:100%}
+.app-shell,.main,.content,.topbar,.table-card,.stat-card{box-sizing:border-box;min-width:0}
+.main{width:auto}
+.content{max-width:1220px;width:100%}
+@media (min-width:1025px){
+ .sidebar{width:252px}
+ .main{margin-left:252px;width:calc(100% - 252px)}
+ .content{padding-left:clamp(24px,4.2%,52px);padding-right:clamp(24px,4.2%,52px)}
+ .stats-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+/* Compact tablet rail */
+@media (min-width:768px) and (max-width:1024px){
+ .sidebar{width:72px!important;padding:20px 8px!important}
+ .brand{justify-content:center;padding:0 0 24px!important}
+ .brand>div:last-child,.workspace,.nav-label,.sidebar .nav-item span,.privacy-card,.sidebar-bottom>.nav-item,.profile>div:nth-child(2),.profile>svg{display:none!important}
+ .sidebar nav .nav-item{justify-content:center!important;padding:13px 0!important;font-size:0!important}
+ .sidebar nav .nav-item svg{width:20px;height:20px;flex:none}
+ .profile{justify-content:center}
+ .main{margin-left:72px!important;width:calc(100% - 72px)!important}
+ .content{padding:28px 22px 24px}
+ .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+/* Phones: no left rail, full-width content, thumb-friendly bottom navigation. */
+@media (max-width:767px){
+ .sidebar{display:none!important;width:0!important}
+ .main{display:block!important;margin:0!important;width:100%!important;max-width:100%!important}
+ .topbar{width:100%!important;min-height:60px;height:auto!important;padding:10px 12px!important;gap:8px}
+ .breadcrumb{flex:1;max-width:none;min-width:0;overflow-wrap:anywhere}
+ .top-actions{gap:7px;min-width:0}
+ .demo-pill,.connection-pill{padding:6px 7px;font-size:9px}
+ .content{width:100%!important;max-width:100%!important;margin:0!important;padding:22px 13px calc(92px + env(safe-area-inset-bottom))!important}
+ .welcome-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+ .welcome-row>div{flex:1 1 190px;min-width:0}
+ .welcome-row h1{font-size:clamp(18px,5vw,23px);line-height:1.35;overflow-wrap:anywhere}
+ .subtitle{font-size:11px;line-height:1.55}
+ .stats-grid,.bottom-grid{grid-template-columns:minmax(0,1fr)!important}
+ .stat-card,.table-card,.insight-card,.trust-card{width:100%;min-width:0}
+ .toolbar,.section-heading{flex-wrap:wrap;gap:10px}
+ .report-controls{padding:0 13px 15px}
+ .report-date-grid{grid-template-columns:minmax(0,1fr)!important}
+ .report-date-grid .form-input{width:100%;max-width:100%}
+ .mobile-nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:30;padding:6px 4px calc(6px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e4eaf0}
+ .mobile-nav button{min-width:0;padding:4px 0;font-size:clamp(8px,2.2vw,10px)}
+ .signout-fab{bottom:calc(78px + env(safe-area-inset-bottom))}
+ footer{flex-wrap:wrap;gap:7px}
+}
+@media (min-width:560px) and (max-width:767px){
+ .report-date-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
