@@ -5,7 +5,7 @@ import {saveOfflineLedgerDraft,listOfflineLedgerDrafts,removeOfflineLedgerDraft}
 import {calculateLedgerBalance,summarizeLedger} from './lib/ledgerMath';
 import {isCurrentScope,filterDraftsForScope} from './lib/sessionGuards';
 const sample=[{id:'d1',display_name:'राम प्रसाद',phone:'98•••••421',notes:''},{id:'d2',display_name:'सीता देवी',phone:'98•••••815',notes:''},{id:'d3',display_name:'मोहन कुमार',phone:'97•••••203',notes:''}];
-const money=n=>{let currency='NPR';try{currency=localStorage.getItem('gtn-setting-currency')||'NPR'}catch{};const symbol=currency==='INR'?'₹':currency==='USD'?'
+const money=n=>{let currency='NPR';try{currency=localStorage.getItem('gtn-setting-currency')||'NPR'}catch{};const symbol=currency==='INR'?'₹':currency==='USD'?'$':'रु ';return symbol+new Intl.NumberFormat('en-IN',{maximumFractionDigits:2}).format(n||0)};
 const initials=n=>(n||'?').trim().slice(0,2);
 const phoneView=p=>p?p.replace(/(\d{2})\d+(\d{2})$/,'$1••••$2'):'फोन नहीं दिया';
 export default function App({mode='demo',user=null}){
