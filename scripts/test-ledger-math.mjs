@@ -37,3 +37,16 @@ test('duplicate reversal references are rejected to prevent double adjustment',(
  const rows=[row('c1','credit','50.00'),row('r1','reversal','50.00',{corrects_entry_id:'c1'}),row('r2','reversal','50.00',{corrects_entry_id:'c1'})];
  assert.throws(()=>calculateLedgerBalance(rows),/एक ही लेन-देन/);
 });
+
+
+test('a date-filtered reversal can resolve its original entry outside the report period',()=>{
+ const all=[row('old-credit','credit','80.00'),row('new-reversal','reversal','80.00',{corrects_entry_id:'old-credit'})];
+ const period=[all[1]];
+ assert.deepEqual(summarizeLedger(period,all),{credit:0,payment:0,reversal:-8000,balance:-8000});
+ assert.equal(calculateLedgerBalance(all),0);
+});
+
+test('a date-filtered reversal still rejects a missing original reference',()=>{
+ const reversal=row('new-reversal','reversal','80.00',{corrects_entry_id:'missing'});
+ assert.throws(()=>summarizeLedger([reversal],[]),/मूल लेन-देन/);
+});
