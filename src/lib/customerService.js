@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { syncOfflineLedgerDraftWithRetry } from './offlineLedgerSync';
-import { centsOf } from './ledgerMath';
+import { centsOf } from './ledgerMath.js';
 export async function listCustomers(userId) {
  if (!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
  if (!userId) throw new Error('लॉगिन उपयोगकर्ता की जानकारी नहीं मिली।');
