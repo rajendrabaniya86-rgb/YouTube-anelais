@@ -1,3 +1,4 @@
+import { centsOf } from './ledgerMath';
 /**
  * Service-layer implementation for syncing one offline ledger draft.
  * The client is injected so the exact production path can be tested without
@@ -9,8 +10,10 @@ export async function syncOfflineLedgerDraftWithClient(client, shopId, userId, d
     throw new Error('ऑफलाइन ड्राफ्ट का खाता मेल नहीं खाता।');
   }
   const amount = Number(draft.amount);
-  if (!Number.isFinite(amount) || amount <= 0 || amount > 999999999999.99 ||
-      Math.round(amount * 100) !== amount * 100 || !['credit', 'payment'].includes(draft.type)) {
+  let amountCents = 0;
+  try { amountCents = centsOf(amount); } catch {}
+  if (!Number.isFinite(amount) || amountCents <= 0 || amountCents > 99999999999999 ||
+      !['credit', 'payment'].includes(draft.type)) {
     throw new Error('ऑफलाइन ड्राफ्ट की रकम या प्रकार सही नहीं है।');
   }
 
