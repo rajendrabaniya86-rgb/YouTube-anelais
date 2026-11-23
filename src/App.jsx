@@ -2,7 +2,7 @@ import React, {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Activity,Bell,BellRing,BookOpen,Check,CircleHelp,Download,Globe,LayoutDashboard,Monitor, Moon,Palette,Plus,RotateCcw,Search,Settings,ShieldCheck,Store,Sun,Users,Vibrate,Volume2,Wallet,X,Wifi,WifiOff} from 'lucide-react';
 import {addCustomer,listCustomers,addLedgerEntry,listPaymentReminders,addPaymentReminder,updatePaymentReminder,syncOfflineLedgerDraft,listPendingCustomerClaims,reviewCustomerLinkClaim,createCustomerLinkInvite} from './lib/customerService';
 import {saveOfflineLedgerDraft,listOfflineLedgerDrafts,removeOfflineLedgerDraft} from './lib/offlineQueue';
-import {calculateLedgerBalance,summarizeLedger} from './lib/ledgerMath';
+import {calculateLedgerBalance,summarizeLedger,centsOf} from './lib/ledgerMath';
 import {isCurrentScope,filterDraftsForScope} from './lib/sessionGuards';
 const sample=[{id:'d1',display_name:'राम प्रसाद',phone:'98•••••421',notes:''},{id:'d2',display_name:'सीता देवी',phone:'98•••••815',notes:''},{id:'d3',display_name:'मोहन कुमार',phone:'97•••••203',notes:''}];
 const money=n=>{let currency='NPR';try{currency=localStorage.getItem('gtn-setting-currency')||'NPR'}catch{};const symbol=currency==='INR'?'₹':currency==='USD'?'$':'रु ';return symbol+new Intl.NumberFormat('en-IN',{maximumFractionDigits:2}).format(n||0)};
@@ -168,7 +168,7 @@ export default function App({mode='demo',user=null}){
  async function saveEntry(e){
   e.preventDefault();const amount=Number(entryForm.amount);
   if(!selected?.id||!Number.isFinite(amount)||amount<=0)return setError('सही रकम लिखें।');
-  if(Math.round(amount*100)!==amount*100)return setError('रकम में अधिकतम दो दशमलव अंक लिखें।');
+  try { const cents=centsOf(amount); if(cents<=0||cents>99999999999999)throw new Error(); } catch { return setError('रकम 0.01 से 999999999999.99 के बीच, अधिकतम दो दशमलव तक लिखें।'); }
   const scopeUserId=user?.id||null,scopeShopId=shop?.id||null,customerId=selected.id;
   const stillCurrent=()=>demo||isCurrentLiveScope(scopeUserId,scopeShopId);
   if(!demo&&!online){
