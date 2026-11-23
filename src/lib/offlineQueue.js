@@ -1,4 +1,4 @@
-import { centsOf } from './ledgerMath';
+import { centsOf } from './ledgerMath.js';
 const DB_NAME = 'global-trust-offline';
 const STORE = 'ledger-drafts';
 const DB_VERSION = 1;
