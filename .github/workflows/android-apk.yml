@@ -1,4 +1,5 @@
 name: Global Trust Network Android APK
+# Re-run the APK pipeline against the latest feature-branch source.
 
 on:
   push:
