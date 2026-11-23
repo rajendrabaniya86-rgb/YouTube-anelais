@@ -55,6 +55,7 @@ export async function addPaymentReminder(shopId,userId,customerId,input) {
 }
 export async function updatePaymentReminder(id,status) {
  if(!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
+ if(!id||!['pending','completed','cancelled'].includes(status)) throw new Error('रिमाइंडर या उसकी स्थिति सही नहीं है।');
  const patch={status,completed_at:status==='completed'?new Date().toISOString():null};
  const {data,error}=await supabase.from('payment_reminders').update(patch).eq('id',id)
   .select('id,shop_id,customer_id,due_at,message,status,created_at,completed_at').single();
