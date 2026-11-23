@@ -14,6 +14,8 @@ test('decimal values are accumulated as integer cents without floating point dri
  const rows=Array.from({length:100},(_,i)=>row(String(i),'credit','0.10'));
  assert.equal(calculateLedgerBalance(rows),1000);
  assert.equal(centsOf('12.34'),1234);
+ assert.equal(centsOf(0.29),29);
+ assert.equal(centsOf(1.15),115);
 });
 
 test('reversal cancels the original entry rather than being treated as a payment',()=>{
