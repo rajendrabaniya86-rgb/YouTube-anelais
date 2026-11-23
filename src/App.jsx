@@ -2,7 +2,7 @@ import React, {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Activity,Bell,BellRing,BookOpen,Check,CircleHelp,Download,Globe,LayoutDashboard,Monitor, Moon,Palette,Plus,RotateCcw,Search,Settings,ShieldCheck,Store,Sun,Users,Vibrate,Volume2,Wallet,X,Wifi,WifiOff} from 'lucide-react';
 import {addCustomer,listCustomers,addLedgerEntry,listPaymentReminders,addPaymentReminder,updatePaymentReminder,syncOfflineLedgerDraft,listPendingCustomerClaims,reviewCustomerLinkClaim,createCustomerLinkInvite} from './lib/customerService';
 import {saveOfflineLedgerDraft,listOfflineLedgerDrafts,removeOfflineLedgerDraft} from './lib/offlineQueue';
-import {calculateLedgerBalance,summarizeLedger,centsOf} from './lib/ledgerMath';
+import {calculateLedgerBalance,summarizeLedger,centsOf} from './lib/ledgerMath.js';
 import {isCurrentScope,filterDraftsForScope} from './lib/sessionGuards';
 const sample=[{id:'d1',display_name:'राम प्रसाद',phone:'98•••••421',notes:''},{id:'d2',display_name:'सीता देवी',phone:'98•••••815',notes:''},{id:'d3',display_name:'मोहन कुमार',phone:'97•••••203',notes:''}];
 const money=n=>{let currency='NPR';try{currency=localStorage.getItem('gtn-setting-currency')||'NPR'}catch{};const symbol=currency==='INR'?'₹':currency==='USD'?'$':'रु ';return symbol+new Intl.NumberFormat('en-IN',{maximumFractionDigits:2}).format(n||0)};
