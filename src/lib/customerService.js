@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { syncOfflineLedgerDraftWithRetry } from './offlineLedgerSync';
+import { centsOf } from './ledgerMath';
 export async function listCustomers(userId) {
  if (!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
  if (!userId) throw new Error('लॉगिन उपयोगकर्ता की जानकारी नहीं मिली।');
@@ -27,7 +28,7 @@ export async function listLedgerEntries(shopId) {
 }
 export async function addLedgerEntry(shopId,userId,customerId,input) {
  if(!supabase) throw new Error('Supabase कनेक्ट नहीं है।');
- const amount=Number(input.amount); if(!Number.isFinite(amount)||amount<=0||amount>999999999999.99||Math.round(amount*100)!==amount*100) throw new Error('रकम 0.01 से 999999999999.99 के बीच, अधिकतम दो दशमलव तक होनी चाहिए।');
+ const amount=Number(input.amount); let amountCents; try { amountCents=centsOf(amount); } catch { throw new Error('रकम 0.01 से 999999999999.99 के बीच, अधिकतम दो दशमलव तक होनी चाहिए।'); } if(amountCents<=0||amountCents>99999999999999) throw new Error('रकम 0.01 से 999999999999.99 के बीच, अधिकतम दो दशमलव तक होनी चाहिए।');
  const {data,error}=await supabase.from('ledger_entries').insert({shop_id:shopId,customer_id:customerId,created_by:userId,entry_type:input.type,amount,note:(input.note||'').trim()}).select('id,shop_id,customer_id,entry_type,amount,note,created_at').single();
  if(error) throw error; return data;
 }
