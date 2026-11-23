@@ -1,4 +1,4 @@
-import {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
+import React, {useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
 import {Activity,Bell,BookOpen,Check,CircleHelp,Download,LayoutDashboard,Plus,Search,ShieldCheck,Store,Users,Wallet,X,Wifi,WifiOff} from 'lucide-react';
 import {addCustomer,listCustomers,addLedgerEntry,listPaymentReminders,addPaymentReminder,updatePaymentReminder,syncOfflineLedgerDraft,listPendingCustomerClaims,reviewCustomerLinkClaim,createCustomerLinkInvite} from './lib/customerService';
 import {saveOfflineLedgerDraft,listOfflineLedgerDrafts,removeOfflineLedgerDraft} from './lib/offlineQueue';
