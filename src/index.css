@@ -61,7 +61,7 @@ html,body,#root{width:100%;min-height:100%;overflow-x:hidden}
  .report-controls{display:flex;flex-direction:column;align-items:stretch;padding:0 14px 16px}
  .report-date-grid{grid-template-columns:minmax(0,1fr);gap:10px}
  .date-reset{width:100%;margin:0}
- .mobile-nav{position:fixed;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:2px;left:0;right:0;bottom:0;z-index:9;padding:7px 5px calc(7px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e4eaf0;box-shadow:0 -5px 20px #14233712}
+ .mobile-nav{position:fixed;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;left:0;right:0;bottom:0;z-index:9;padding:7px 5px calc(7px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e4eaf0;box-shadow:0 -5px 20px #14233712}
  .mobile-nav button{min-width:0;min-height:48px;border:0;border-radius:9px;background:transparent;color:#718096;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 1px;font:500 9px 'Noto Sans Devanagari',sans-serif;line-height:1.2;overflow-wrap:anywhere}
  .mobile-nav button svg{width:17px;height:17px;flex:none}
  .mobile-nav button.active{background:#eef4e4;color:#405d1c;font-weight:700}
@@ -117,7 +117,7 @@ img,svg,video,canvas{max-width:100%}
  .report-controls{padding:0 13px 15px}
  .report-date-grid{grid-template-columns:minmax(0,1fr)!important}
  .report-date-grid .form-input{width:100%;max-width:100%}
- .mobile-nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:30;padding:6px 4px calc(6px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e4eaf0}
+ .mobile-nav{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:30;padding:6px 4px calc(6px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #e4eaf0}
  .mobile-nav button{min-width:0;padding:4px 0;font-size:clamp(8px,2.2vw,10px)}
  .signout-fab{bottom:calc(78px + env(safe-area-inset-bottom))}
  footer{flex-wrap:wrap;gap:7px}
