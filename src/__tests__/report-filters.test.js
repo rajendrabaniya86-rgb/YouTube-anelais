@@ -17,6 +17,10 @@ describe('report date range', () => {
   it('rejects inverted or malformed ranges', () => {
     expect(isValidReportDateRange('2026-01-04', '2026-01-03')).toBe(false);
     expect(isValidReportDateRange('02-01-2026', '')).toBe(false);
+    expect(isValidReportDateRange('2026-02-31', '')).toBe(false);
+    expect(isValidReportDateRange('2026-13-01', '')).toBe(false);
+    expect(isValidReportDateRange('2024-02-29', '')).toBe(true);
+    expect(isValidReportDateRange('2025-02-29', '')).toBe(false);
   });
   it('includes both boundary days and excludes invalid timestamps', () => {
     expect(filterEntriesByDateRange(rows, '2026-01-02', '2026-01-03').map(x => x.id))
