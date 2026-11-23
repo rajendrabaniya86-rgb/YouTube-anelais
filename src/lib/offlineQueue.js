@@ -1,3 +1,4 @@
+import { centsOf } from './ledgerMath';
 const DB_NAME = 'global-trust-offline';
 const STORE = 'ledger-drafts';
 const DB_VERSION = 1;
@@ -48,9 +49,10 @@ function runTransaction(db, mode, action, fallbackMessage) {
 }
 
 export async function saveOfflineLedgerDraft(input) {
+  let amountCents = 0;
+  try { amountCents = centsOf(input?.amount); } catch {}
   if (!input?.userId || !input?.shopId || !input?.customerId ||
-      !Number.isFinite(Number(input.amount)) || Number(input.amount) <= 0 ||
-      Number(input.amount) > 999999999999.99 || Math.round(Number(input.amount) * 100) !== Number(input.amount) * 100 ||
+      amountCents <= 0 || amountCents > 99999999999999 ||
       !['credit', 'payment'].includes(input.type)) {
     throw new Error('ऑफलाइन ड्राफ्ट की जानकारी सही नहीं है।');
   }
