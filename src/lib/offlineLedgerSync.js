@@ -1,4 +1,4 @@
-import { centsOf } from './ledgerMath';
+import { centsOf } from './ledgerMath.js';
 /**
  * Service-layer implementation for syncing one offline ledger draft.
  * The client is injected so the exact production path can be tested without
