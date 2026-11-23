@@ -29,9 +29,9 @@ export function calculateLedgerBalance(entries){
  }
  return balance;
 }
-export function summarizeLedger(entries){
+export function summarizeLedger(entries, referenceEntries = entries){
  let credit=0,payment=0,reversal=0;const reversed=new Set();
- const byId=new Map(entries.map(x=>[x.id,x]));
+ const byId=new Map(referenceEntries.map(x=>[x.id,x]));
  for(const entry of entries){
   if(entry.entry_type==='credit') credit+=centsOf(entry.amount);
   else if(entry.entry_type==='payment') payment+=centsOf(entry.amount);
