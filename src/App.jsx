@@ -308,7 +308,6 @@ export default function App({mode='demo',user=null}){
  <p className="demo-note">{demo?'डेमो रिकॉर्ड केवल इस डिवाइस पर सेव होता है।':'लाइव रिकॉर्ड दुकान के सुरक्षित डेटाबेस में सेव होता है।'}</p></div></div>}</div>
 }
 function CustomerTable({customers,select}){return <div className="table-card"><div className="table-wrap"><table><thead><tr><th>ग्राहक</th><th>फोन</th><th>रिकॉर्ड</th><th></th></tr></thead><tbody>{customers.map(c=><tr key={c.id}><td><button className="customer-cell" onClick={()=>select(c)}><span className="avatar mint">{initials(c.display_name)}</span><span><b>{c.display_name}</b><small>ग्राहक</small></span></button></td><td className="last-seen">{phoneView(c.phone)}</td><td><span className="status clear">सेव</span></td><td><button className="row-action" onClick={()=>select(c)}>विवरण देखें</button></td></tr>)}</tbody></table>{!customers.length&&<div className="no-results">अभी कोई ग्राहक नहीं है। “ग्राहक जोड़ें” दबाएँ।</div>}</div><div className="table-foot"><span>{customers.length} ग्राहक रिकॉर्ड</span><span>नाम और फोन से खोज सकते हैं</span></div></div>}
-:'रु ';return symbol+new Intl.NumberFormat('en-IN',{maximumFractionDigits:2}).format(n||0)};
 const initials=n=>(n||'?').trim().slice(0,2);
 const phoneView=p=>p?p.replace(/(\d{2})\d+(\d{2})$/,'$1••••$2'):'फोन नहीं दिया';
 export default function App({mode='demo',user=null}){
