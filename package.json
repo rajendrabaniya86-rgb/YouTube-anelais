@@ -11,7 +11,8 @@
     "test:offline-ledger-service": "node --test scripts/test-offline-ledger-service.mjs",
     "test:ledger-math": "node --test scripts/test-ledger-math.mjs",
     "test:session-guards": "node --test scripts/test-session-guards.mjs",
-    "test:ui-isolation": "vitest run --config vitest.config.js"
+    "test:ui-isolation": "vitest run --config vitest.config.js",
+    "test:universal-ledger-migration": "node --test scripts/test-universal-ledger-migration.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
