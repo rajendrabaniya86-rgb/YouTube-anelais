@@ -20,6 +20,7 @@ const requiredMigrations = [
   '016_shop_owner_customer_claim_review.sql',
   '017_explicit_deny_customer_link_tables.sql',
   '018_universal_identity_and_customer_ledger.sql',
+  '019_private_ledger_rpc_hardening.sql',
 ];
 const requiredFunctions = [
   'create-customer-link-invite',

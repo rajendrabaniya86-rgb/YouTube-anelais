@@ -67,6 +67,7 @@ jobs:
           npm run test:ledger-math
           npm run test:session-guards
           npm run test:universal-ledger-migration
+          npm run test:universal-ledger-hardening
           npm run test:ui-isolation
 
       - name: Build production web app
