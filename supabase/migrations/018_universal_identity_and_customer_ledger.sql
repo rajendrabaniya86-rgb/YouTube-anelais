@@ -240,6 +240,7 @@ returns table (
   entry_type text,
   amount numeric,
   note text,
+  corrects_entry_id uuid,
   occurred_at timestamptz
 )
 language plpgsql
@@ -256,7 +257,7 @@ begin
 
   return query
   select p.gtn_id, s.id, s.shop_name, cu.id, cu.display_name,
-         le.id, le.entry_type, le.amount, le.note, le.created_at
+         le.id, le.entry_type, le.amount, le.note, le.corrects_entry_id, le.created_at
     from public.customer_ledger_access a
     join public.profiles p on p.id = a.customer_user_id
     join public.shops s on s.id = a.shop_id

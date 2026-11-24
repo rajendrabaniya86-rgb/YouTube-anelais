@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
 import { redeemCustomerLinkInvite } from './lib/customerService';
 import { shouldApplyInitialSession } from './lib/sessionGuards';
+import { calculateLedgerBalance } from './lib/ledgerMath.js';
 
 function friendlyAuthError(error) {
   const raw = String(error?.message || error || '').toLowerCase();
@@ -23,6 +24,154 @@ function friendlyAuthError(error) {
   if (raw.includes('password should be at least')) return 'पासवर्ड कम से कम 8 अक्षर का रखें।';
   return error?.message || 'लॉगिन सेवा से अनुरोध पूरा नहीं हो पाया। कुछ देर बाद फिर प्रयास करें।';
 }
+
+
+function formatGtnMoney(amount) {
+  const value = Number(amount || 0) / 100;
+  return 'रु ' + new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+}
+
+function CustomerUniversalLedger({ signOut, signingOut }) {
+  const [claims, setClaims] = useState([]);
+  const [ledger, setLedger] = useState([]);
+  const [gtnId, setGtnId] = useState('');
+  const [loadingLedger, setLoadingLedger] = useState(true);
+  const [busyId, setBusyId] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  async function refreshLedger() {
+    if (!supabase) throw new Error('सुरक्षित सर्वर कनेक्शन उपलब्ध नहीं है।');
+    setLoadingLedger(true);
+    setError('');
+    try {
+      const [claimResult, ledgerResult, profileResult] = await Promise.all([
+        supabase.rpc('get_my_approved_customer_claims'),
+        supabase.rpc('get_my_universal_ledger'),
+        supabase.from('profiles').select('gtn_id').single()
+      ]);
+      if (claimResult.error) throw claimResult.error;
+      if (ledgerResult.error) throw ledgerResult.error;
+      if (profileResult.error) throw profileResult.error;
+      setClaims(Array.isArray(claimResult.data) ? claimResult.data : []);
+      setLedger(Array.isArray(ledgerResult.data) ? ledgerResult.data : []);
+      setGtnId(profileResult.data?.gtn_id || '');
+    } catch (loadError) {
+      setError(loadError?.message || 'आपका साझा खाता लोड नहीं हो पाया।');
+    } finally {
+      setLoadingLedger(false);
+    }
+  }
+
+  useEffect(() => { refreshLedger(); }, []);
+
+  async function confirmAccess(claim) {
+    setBusyId(claim.claim_id);
+    setError('');
+    setNotice('');
+    try {
+      const { data, error: rpcError } = await supabase.rpc('confirm_customer_ledger_access', { p_claim_id: claim.claim_id });
+      if (rpcError) throw rpcError;
+      if (!data?.ledger_access_granted) throw new Error('सर्वर ने अनुमति की पुष्टि नहीं की।');
+      setNotice(claim.shop_name + ' का खाता जुड़ गया।');
+      await refreshLedger();
+    } catch (actionError) {
+      setError(actionError?.message || 'खाता जोड़ने की अनुमति सेव नहीं हुई।');
+    } finally { setBusyId(''); }
+  }
+
+  async function revokeAccess(claim) {
+    const key = claim.shop_id + ':' + claim.customer_id;
+    setBusyId(key);
+    setError('');
+    setNotice('');
+    try {
+      const { data, error: rpcError } = await supabase.rpc('revoke_customer_ledger_access', {
+        p_shop_id: claim.shop_id,
+        p_customer_id: claim.customer_id
+      });
+      if (rpcError) throw rpcError;
+      if (!data?.ledger_access_revoked) throw new Error('सर्वर ने अनुमति वापस लेने की पुष्टि नहीं की।');
+      setNotice(claim.shop_name + ' का हिसाब अब आपके डैशबोर्ड में साझा नहीं होगा।');
+      await refreshLedger();
+    } catch (actionError) {
+      setError(actionError?.message || 'अनुमति वापस नहीं ली जा सकी।');
+    } finally { setBusyId(''); }
+  }
+
+  const shops = Array.from(ledger.reduce((map, row) => {
+    if (!map.has(row.shop_id)) map.set(row.shop_id, { shopId: row.shop_id, shopName: row.shop_name, customerName: row.customer_name, rows: [] });
+    map.get(row.shop_id).rows.push({
+      id: row.entry_id,
+      entry_type: row.entry_type,
+      amount: row.amount,
+      corrects_entry_id: row.corrects_entry_id
+    });
+    return map;
+  }, new Map()).values()).map(shop => ({
+    ...shop,
+    balance: calculateLedgerBalance(shop.rows)
+  }));
+  const totalBalance = shops.reduce((sum, shop) => sum + shop.balance, 0);
+
+  return (
+    <main className="auth-screen">
+      <section className="auth-card" style={{ width: 'min(760px,100%)', maxHeight: '92vh', overflowY: 'auto' }}>
+        <div className="auth-brand"><span><ShieldCheck size={27}/></span><div><b>GLOBAL TRUST</b><small>UNIVERSAL LEDGER</small></div></div>
+        <div className="auth-kicker"><ShieldCheck size={14}/> ग्राहक का निजी डैशबोर्ड</div>
+        <h1>मेरा पूरा उधार और भुगतान</h1>
+        <p className="auth-desc">एक ही GTN ID से जुड़े उन दुकानों का हिसाब यहाँ दिखेगा, जिनकी अनुमति आपने खुद दी है।</p>
+        <div style={{background:'#f1f6e9',border:'1px solid #dce8c9',borderRadius:12,padding:14,marginBottom:14}}>
+          <small style={{display:'block',color:'#66758a'}}>आपकी स्थायी GTN ID</small>
+          <strong style={{fontSize:18,color:'#263a1b'}}>{gtnId || 'ID लोड हो रही है…'}</strong>
+        </div>
+        <div style={{background:'#172b40',color:'#fff',borderRadius:13,padding:17,marginBottom:18}}>
+          <small style={{opacity:.78}}>सभी जुड़े दुकानों का कुल बाकी</small>
+          <div style={{fontSize:28,fontWeight:800,marginTop:5}}>{formatGtnMoney(totalBalance)}</div>
+          <small style={{opacity:.72}}>यह दुकानों के रिकॉर्ड का कुल बकाया है, बैंक बैलेंस नहीं।</small>
+        </div>
+        {error && <div className="auth-message" role="alert">{error}</div>}
+        {notice && <div className="auth-message" role="status">{notice}</div>}
+        <h2 style={{fontSize:16,margin:'18px 0 8px'}}>दुकान कनेक्शन और अनुमति</h2>
+        {loadingLedger ? <p className="auth-desc">आपका सुरक्षित रिकॉर्ड लोड हो रहा है…</p> : claims.length === 0 ? (
+          <p className="auth-desc">अभी कोई दुकानदार अनुरोध मंजूर नहीं हुआ है। दुकानदार से अपना एक बार का GTN लिंक कोड माँगें।</p>
+        ) : claims.map(claim => {
+          const key = claim.shop_id + ':' + claim.customer_id;
+          const busy = busyId === claim.claim_id || busyId === key;
+          return <div key={claim.claim_id} style={{border:'1px solid #e5ebf1',borderRadius:11,padding:12,marginBottom:9}}>
+            <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center'}}>
+              <div><strong style={{fontSize:13}}>{claim.shop_name}</strong><small style={{display:'block',color:'#7d8998',marginTop:3}}>ग्राहक रिकॉर्ड: {claim.customer_name}</small></div>
+              <span style={{fontSize:10,color:claim.ledger_access_active?'#28734a':'#9a6a2d'}}>{claim.ledger_access_active?'अनुमति चालू':'अनुमति बाकी'}</span>
+            </div>
+            {claim.ledger_access_active
+              ? <button className="secondary-btn" disabled={busy} onClick={()=>revokeAccess(claim)}>{busy?'कृपया प्रतीक्षा करें…':'इस दुकान का हिसाब साझा करना बंद करें'}</button>
+              : <button className="primary-btn auth-submit" disabled={busy} onClick={()=>confirmAccess(claim)}>{busy?'अनुमति सेव हो रही है…':'मैं इस दुकान का हिसाब देखना चाहता/चाहती हूँ'}</button>}
+          </div>;
+        })}
+        <h2 style={{fontSize:16,margin:'20px 0 8px'}}>सभी दुकानों का लेन-देन इतिहास</h2>
+        {shops.length === 0 ? <p className="auth-desc">अनुमति देने के बाद संबंधित दुकान का लेन-देन और बाकी रकम यहाँ दिखेगी।</p> : shops.map(shop => (
+          <div key={shop.shopId} style={{border:'1px solid #e5ebf1',borderRadius:11,padding:13,marginBottom:10}}>
+            <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center'}}>
+              <strong>{shop.shopName}</strong><strong>{formatGtnMoney(shop.balance)}</strong>
+            </div>
+            <small style={{color:'#7d8998'}}>ग्राहक: {shop.customerName} • बाकी रकम</small>
+            <div style={{marginTop:9,borderTop:'1px solid #edf0f4',paddingTop:8}}>
+              {ledger.filter(row=>row.shop_id===shop.shopId).map(row=>(
+                <div key={row.entry_id} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'6px 0',fontSize:11,borderBottom:'1px solid #f0f2f5'}}>
+                  <span>{row.entry_type==='credit'?'उधार':row.entry_type==='payment'?'भुगतान':'रिवर्सल'} • {new Date(row.occurred_at).toLocaleString('hi-IN')}</span>
+                  <strong>{formatGtnMoney(Math.round(Number(row.amount)*100))}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <button className="secondary-btn" onClick={refreshLedger} disabled={loadingLedger}>रिकॉर्ड फिर से अपडेट करें</button>
+        <button className="auth-switch" onClick={signOut} disabled={signingOut}>{signingOut?'लॉग आउट हो रहा है…':'लॉग आउट'}</button>
+      </section>
+    </main>
+  );
+}
+
 
 export default function AuthGate({ children }) {
   const [session, setSession] = useState(null);
@@ -453,7 +602,7 @@ export default function AuthGate({ children }) {
   }
 
   if (loading || (googleSetup && session?.user)) return <div className="auth-loading">{googleSetup ? 'Google खाता सुरक्षित रूप से तैयार किया जा रहा है…' : 'सुरक्षित लॉगिन जाँचा जा रहा है…'}</div>;
-  if (session && session.user?.user_metadata?.account_type === 'customer') return <main className="auth-screen"><section className="auth-card"><div className="auth-brand"><span><ShieldCheck size={27}/></span><div><b>GLOBAL TRUST</b><small>NETWORK</small></div></div><div className="auth-kicker"><ShieldCheck size={14}/> ग्राहक पोर्टल</div><h1>अपना ग्राहक रिकॉर्ड जोड़ें</h1><p className="auth-desc">दुकानदार से मिला एक बार का निमंत्रण कोड यहाँ दर्ज करें। अनुरोध जमा होने पर भी दुकान का बैलेंस या लेन-देन नहीं दिखेगा। पहले दुकानदार की जाँच और सुरक्षित मंजूरी जरूरी है।</p><form onSubmit={redeemInvite}><label>निमंत्रण कोड</label><input value={inviteCode} onChange={e=>setInviteCode(e.target.value.trim())} placeholder="दुकानदार से मिला कोड" minLength="40" maxLength="50" autoComplete="off" required/><button className="primary-btn auth-submit" type="submit" disabled={submitting}>{submitting?'जाँच हो रही है…':'निमंत्रण कोड जमा करें'} <ArrowRight size={17}/></button></form>{message&&<div className="auth-message" role="status">{message}</div>}<button className="auth-switch" onClick={signOut} disabled={signingOut}>{signingOut?'लॉग आउट हो रहा है…':'लॉग आउट'}</button></section></main>
+  if (session && session.user?.user_metadata?.account_type === 'customer') return <CustomerUniversalLedger signOut={signOut} signingOut={signingOut} />;
   if (session) return <>{React.cloneElement(children, { mode: 'live', user: session.user })}<button className="signout-fab" onClick={signOut} disabled={signingOut}>{signingOut?'लॉग आउट हो रहा है…':'लॉग आउट'}</button></>;
   if (localGuest) return <>{React.cloneElement(children, { mode: 'private', user: { id: localGuest.id, user_metadata: { full_name: localGuest.name, account_type: 'shop_owner', shop_name: 'निजी कार्यक्षेत्र' } } })}<button className="signout-fab" onClick={leavePrivateSpace}>निजी जगह बंद करें</button></>;
   if (demo) return <>{React.cloneElement(children, { mode: 'demo', user: null })}<div className="demo-banner">डेमो मोड: नमूना डेटा ही दिखाया जा रहा है। <button onClick={() => setDemo(false)}>लॉगिन पर लौटें</button></div></>;
